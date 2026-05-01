@@ -303,9 +303,12 @@ export default function NovoRegistro() {
 
         .glass-form {
           border: 1px solid var(--glass-border);
-          padding: 28px;
+          padding: clamp(16px, 5vw, 28px);
           background: linear-gradient(165deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
           box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
         }
 
         .platform-toggle {
@@ -355,11 +358,19 @@ export default function NovoRegistro() {
           gap: 16px;
         }
 
+        @media (max-width: 400px) {
+          .input-row {
+            grid-template-columns: 1fr;
+            gap: 20px;
+          }
+        }
+
         .input-group label {
           display: flex;
           align-items: center;
           gap: 6px;
-          margin-bottom: 6px;
+          margin-bottom: 8px;
+          font-size: 0.75rem;
         }
 
         .submit-btn {
