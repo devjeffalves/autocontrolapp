@@ -45,13 +45,33 @@ export default function Veiculo() {
   const [realAvg, setRealAvg] = useState<number | null>(null);
   const displayAvg = realAvg || vehicle.avgConsumption;
 
+  // Auto-save logic
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const timer = setTimeout(() => {
+      saveToDb();
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [vehicle]);
+
+  const saveToDb = async () => {
+    try {
+      await fetch('/api/vehicle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(vehicle),
+      });
+      console.log('Veículo salvo automaticamente');
+    } catch (error) {
+      console.error('Erro no auto-save:', error);
+    }
+  };
+
   const handleSave = async () => {
-    const res = await fetch('/api/vehicle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(vehicle),
-    });
-    if (res.ok) setIsEditing(false);
+    await saveToDb();
+    setIsEditing(false);
   };
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -16,6 +16,23 @@ export default function NovoRegistro() {
     earnings: '',
     date: new Date().toISOString().split('T')[0]
   });
+
+  // Carregar rascunho ao iniciar
+  useEffect(() => {
+    const draft = localStorage.getItem('ride_draft');
+    if (draft) {
+      try {
+        setFormData(JSON.parse(draft));
+      } catch (e) {
+        console.error('Erro ao carregar rascunho:', e);
+      }
+    }
+  }, []);
+
+  // Salvar rascunho ao alterar campos
+  useEffect(() => {
+    localStorage.setItem('ride_draft', JSON.stringify(formData));
+  }, [formData]);
 
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -63,6 +80,7 @@ export default function NovoRegistro() {
 
       if (response.ok) {
         setNotification({ type: 'success', message: 'Registro salvo com sucesso!' });
+        localStorage.removeItem('ride_draft');
         setFormData({
           platform: 'Uber',
           rides: '',
