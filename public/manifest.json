@@ -1,0 +1,16 @@
+{
+  "name": "AutoControl",
+  "short_name": "AutoControl",
+  "description": "Gestão para Motoristas de Aplicativo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1995/1995470.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
