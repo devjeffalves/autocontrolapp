@@ -19,7 +19,7 @@ export default function Veiculo() {
       try {
         const [vRes, rRes] = await Promise.all([
           fetch('/api/vehicle'),
-          fetch('/api/rides')
+          fetch('/api/rides?status=closed')
         ]);
         const vData = await vRes.json();
         const rData = await rRes.json();
@@ -27,12 +27,21 @@ export default function Veiculo() {
         if (vData.data) setVehicle(vData.data);
         
         if (rData.success) {
-          const ridesWithFuel = rData.data.filter((r: any) => r.fuelLitres > 0);
-          const totalKmWithFuel = ridesWithFuel.reduce((acc: number, curr: any) => acc + (curr.kmEnd - curr.kmStart), 0);
-          const totalLitres = ridesWithFuel.reduce((acc: number, curr: any) => acc + curr.fuelLitres, 0);
+          const closedRides = rData.data;
+          
+          let totalLitres = 0;
+          let totalKm = 0;
+          
+          closedRides.forEach((r: any) => {
+            const rideLitres = r.fuelings?.reduce((acc: number, curr: any) => acc + (curr.litres || 0), 0) || 0;
+            if (rideLitres > 0) {
+              totalLitres += rideLitres;
+              totalKm += (r.kmTotal || 0);
+            }
+          });
           
           if (totalLitres > 0) {
-            setRealAvg((totalKmWithFuel / totalLitres));
+            setRealAvg((totalKm / totalLitres));
           }
         }
       } catch (error) {
@@ -63,7 +72,6 @@ export default function Veiculo() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vehicle),
       });
-      console.log('Veículo salvo automaticamente');
     } catch (error) {
       console.error('Erro no auto-save:', error);
     }
@@ -169,7 +177,7 @@ export default function Veiculo() {
 
       <section className="consumption-section card glass">
         <div className="section-header">
-          <h3 className="section-title">Eficiência</h3>
+          <h3 className="section-title">Eficiência Real</h3>
           <PenLine size={16} className="text-muted" />
         </div>
         <div className="consumption-display">
@@ -218,7 +226,7 @@ export default function Veiculo() {
         .veiculo-page {
           display: flex;
           flex-direction: column;
-          gap: 24px;
+          gap: 20px;
         }
 
         .input-row {
@@ -228,22 +236,21 @@ export default function Veiculo() {
         }
 
         .input-group select {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid var(--glass-border);
+          background: #f1f5f9;
+          border: 1px solid transparent;
           border-radius: var(--radius-md);
           padding: 14px 16px;
-          color: white;
+          color: var(--foreground);
           font-size: 1rem;
           transition: all 0.2s;
           width: 100%;
         }
 
-
         .header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-top: 10px;
+          padding-top: 10px;
         }
 
         .title {
@@ -258,13 +265,15 @@ export default function Veiculo() {
           align-items: center;
           justify-content: center;
           border-radius: 12px;
+          color: var(--foreground);
         }
 
         .vehicle-card {
           display: flex;
           flex-direction: column;
           gap: 24px;
-          background: linear-gradient(135deg, var(--card-bg), rgba(59, 130, 246, 0.1));
+          background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+          border-color: var(--card-border);
         }
 
         .vehicle-visual {
@@ -276,7 +285,7 @@ export default function Veiculo() {
         .car-icon-bg {
           width: 80px;
           height: 80px;
-          background: var(--glass);
+          background: #eff6ff;
           border-radius: 20px;
           display: flex;
           align-items: center;
@@ -287,10 +296,11 @@ export default function Veiculo() {
         .vehicle-header-info h2 {
           font-size: 1.25rem;
           margin-bottom: 6px;
+          color: #0f172a;
         }
 
         .plate-badge {
-          background: #fff;
+          background: #ffffff;
           color: #000;
           padding: 2px 8px;
           border-radius: 4px;
@@ -298,13 +308,14 @@ export default function Veiculo() {
           font-weight: 700;
           font-size: 0.875rem;
           border: 2px solid #000;
+          display: inline-block;
         }
 
         .vehicle-details {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 16px;
-          border-top: 1px solid var(--glass-border);
+          border-top: 1px solid var(--card-border);
           padding-top: 20px;
         }
 
@@ -321,7 +332,8 @@ export default function Veiculo() {
 
         .detail-value {
           font-size: 0.875rem;
-          font-weight: 600;
+          font-weight: 700;
+          color: #1e293b;
         }
 
         .consumption-display {
@@ -330,24 +342,22 @@ export default function Veiculo() {
         }
 
         .consumption-number {
-          font-size: 3rem;
+          font-size: 3.5rem;
           font-weight: 800;
-          background: linear-gradient(to bottom, #fff, var(--text-muted));
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
+          color: #0f172a;
         }
 
         .consumption-unit {
           font-size: 1rem;
-          font-weight: 600;
+          font-weight: 700;
           color: var(--primary);
-          margin-left: 8px;
+          margin-left: 6px;
         }
 
         .consumption-subtext {
           font-size: 0.75rem;
           color: var(--text-muted);
-          margin-top: 4px;
+          margin-top: -4px;
         }
 
         .consumption-progress {
@@ -355,25 +365,26 @@ export default function Veiculo() {
         }
 
         .progress-bar {
-          height: 8px;
-          background: var(--glass);
-          border-radius: 4px;
+          height: 10px;
+          background: #f1f5f9;
+          border-radius: 5px;
           overflow: hidden;
           margin-bottom: 8px;
         }
 
         .progress-fill {
           height: 100%;
-          background: linear-gradient(to right, var(--warning), var(--success));
-          border-radius: 4px;
+          background: linear-gradient(to right, var(--danger), var(--warning), var(--success));
+          border-radius: 5px;
         }
 
         .progress-labels {
           display: flex;
           justify-content: space-between;
-          font-size: 0.625rem;
+          font-size: 0.65rem;
           color: var(--text-muted);
-          font-weight: 600;
+          font-weight: 700;
+          text-transform: uppercase;
         }
 
         .maintenance-list {
@@ -382,10 +393,19 @@ export default function Veiculo() {
           gap: 12px;
         }
 
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+
         .section-title {
-          font-size: 1rem;
-          font-weight: 600;
-          margin-bottom: 8px;
+          font-size: 0.9rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
         }
 
         .maintenance-item {
@@ -396,7 +416,8 @@ export default function Veiculo() {
         }
 
         .maintenance-name {
-          font-weight: 600;
+          font-weight: 700;
+          color: #1e293b;
         }
 
         .maintenance-due {
@@ -405,17 +426,18 @@ export default function Veiculo() {
         }
 
         .maintenance-status {
-          font-size: 0.75rem;
-          font-weight: 700;
+          font-size: 0.7rem;
+          font-weight: 800;
           color: var(--success);
-          padding: 4px 8px;
-          background: rgba(16, 185, 129, 0.1);
-          border-radius: 6px;
+          padding: 4px 10px;
+          background: #d1fae5;
+          border-radius: 20px;
+          text-transform: uppercase;
         }
 
         .maintenance-status.urgent {
-          color: var(--warning);
-          background: rgba(245, 158, 11, 0.1);
+          color: #b45309;
+          background: #fef3c7;
         }
 
         .text-muted {
@@ -425,3 +447,4 @@ export default function Veiculo() {
     </div>
   );
 }
+

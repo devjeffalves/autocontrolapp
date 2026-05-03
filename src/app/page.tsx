@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Dashboard() {
   const [period, setPeriod] = useState('Semana');
@@ -41,8 +42,11 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  // Filtragem por período
-  const filteredRides = rides.filter(ride => {
+  // Filtragem por período (apenas sessões fechadas para as estatísticas principais)
+  const closedRides = rides.filter(r => r.status === 'closed');
+  const activeSession = rides.find(r => r.status === 'open');
+
+  const filteredRides = closedRides.filter(ride => {
     const rideDate = new Date(ride.date);
     const now = new Date();
     if (period === 'Dia') {
@@ -58,16 +62,23 @@ export default function Dashboard() {
   });
 
   // Cálculos baseados nos dados filtrados
-  const totalEarnings = filteredRides.reduce((acc, curr) => acc + curr.earnings, 0);
-  const totalKm = filteredRides.reduce((acc, curr) => acc + (curr.kmEnd - curr.kmStart), 0);
+  const totalEarnings = filteredRides.reduce((acc, curr) => acc + (curr.earnings || 0), 0);
+  const totalKm = filteredRides.reduce((acc, curr) => acc + (curr.kmTotal || 0), 0);
   
-  // Cálculo de rendimento real (km/L)
-  const ridesWithFuel = rides.filter(r => r.fuelLitres > 0);
-  const totalKmWithFuel = ridesWithFuel.reduce((acc, curr) => acc + (curr.kmEnd - curr.kmStart), 0);
-  const totalLitres = ridesWithFuel.reduce((acc, curr) => acc + curr.fuelLitres, 0);
+  // Cálculo de rendimento real (km/L) - soma todos os abastecimentos de todas as corridas
+  const totalLitres = closedRides.reduce((acc, curr) => {
+    const rideLitres = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
+    return acc + rideLitres;
+  }, 0);
+
+  const totalKmForFuel = closedRides.reduce((acc, curr) => {
+    // Só conta KM de corridas que tiveram abastecimento ou que queremos considerar no cálculo
+    const hasFuel = curr.fuelings && curr.fuelings.length > 0;
+    return hasFuel ? acc + (curr.kmTotal || 0) : acc;
+  }, 0);
   
   const realAvgConsumption = totalLitres > 0 
-    ? (totalKmWithFuel / totalLitres).toFixed(2) 
+    ? (totalKmForFuel / totalLitres).toFixed(2) 
     : (vehicle?.avgConsumption || 0).toFixed(1);
   
   const stats = [
@@ -117,6 +128,23 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {activeSession && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="active-alert card"
+        >
+          <div className="alert-content">
+            <div className="pulse-icon" />
+            <div>
+              <h3 className="alert-title">Turno em andamento</h3>
+              <p className="alert-desc">Iniciado às {new Date(activeSession.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+            </div>
+          </div>
+          <Link href="/novo" className="btn-alert">Continuar</Link>
+        </motion.div>
+      )}
+
       <section className="stats-grid">
         {stats.map((stat, index) => (
           <motion.div 
@@ -149,7 +177,6 @@ export default function Dashboard() {
           <TrendingUp size={18} className="text-muted" />
         </div>
         <div className="chart-placeholder">
-          {/* Visual representation of a chart using divs */}
           <div className="bars-container">
             {[40, 70, 45, 90, 65, 80, 55].map((height, i) => (
               <motion.div 
@@ -190,13 +217,13 @@ export default function Dashboard() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <div className={`platform-badge ${item.platform.toLowerCase()}`}>
+                  <div className={`platform-badge ${item.platform?.toLowerCase() || 'uber'}`}>
                     {item.platform}
                   </div>
                   <div className="activity-info">
                     <p className="activity-value">R$ {item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                     <p className="activity-meta">
-                      {(item.kmEnd - item.kmStart).toFixed(1)}km • {new Date(item.date).toLocaleDateString('pt-BR')}
+                      {item.kmTotal?.toFixed(1) || 0}km • {new Date(item.date).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
                   <ArrowUpRight size={18} className="text-muted" />
@@ -206,6 +233,7 @@ export default function Dashboard() {
           </AnimatePresence>
         </div>
       </section>
+
 
       <style jsx>{`
         .loading-state {
@@ -415,6 +443,76 @@ export default function Dashboard() {
 
         .text-muted {
           color: var(--text-muted);
+        }
+
+        /* Active Alert Styles */
+        .active-alert {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+          border: 1px solid #bfdbfe;
+          box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.1);
+        }
+
+        .alert-content {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .pulse-icon {
+          width: 12px;
+          height: 12px;
+          background: var(--success);
+          border-radius: 50%;
+          position: relative;
+        }
+
+        .pulse-icon::after {
+          content: '';
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          background: var(--success);
+          border-radius: 50%;
+          animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 0.8; }
+          70% { transform: scale(2.5); opacity: 0; }
+          100% { transform: scale(2.5); opacity: 0; }
+        }
+
+        .alert-title {
+          font-size: 0.9375rem;
+          font-weight: 700;
+          color: #1e40af;
+          margin-bottom: 2px;
+        }
+
+        .alert-desc {
+          font-size: 0.8125rem;
+          color: #60a5fa;
+          font-weight: 600;
+        }
+
+        .btn-alert {
+          background: #2563eb;
+          color: white;
+          text-decoration: none;
+          padding: 8px 16px;
+          border-radius: 10px;
+          font-size: 0.875rem;
+          font-weight: 700;
+          transition: all 0.2s;
+        }
+
+        .btn-alert:hover {
+          background: #1d4ed8;
+          transform: translateY(-1px);
         }
       `}</style>
     </div>

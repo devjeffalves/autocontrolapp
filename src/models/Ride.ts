@@ -1,29 +1,40 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IFueling {
+  cost: number;
+  litres: number;
+  date: Date;
+}
+
 export interface IRide extends Document {
-  platform: 'Uber' | '99';
+  platform: 'Uber' | '99' | 'Both';
   rides: number;
   kmStart: number;
-  kmEnd: number;
-  kmTotal: number;
-  fuelCost?: number;
-  fuelLitres?: number;
+  kmEnd?: number;
+  kmTotal?: number;
+  fuelings: IFueling[];
   earnings: number;
+  status: 'open' | 'closed';
   date: Date;
   createdAt: Date;
 }
 
 const RideSchema: Schema = new Schema({
-  platform: { type: String, required: true, enum: ['Uber', '99'] },
-  rides: { type: Number, required: true },
+  platform: { type: String, required: true, enum: ['Uber', '99', 'Both'], default: 'Uber' },
+  rides: { type: Number, default: 0 },
   kmStart: { type: Number, required: true },
-  kmEnd: { type: Number, required: true },
-  kmTotal: { type: Number, required: true },
-  fuelCost: { type: Number, default: 0 },
-  fuelLitres: { type: Number, default: 0 },
-  earnings: { type: Number, required: true },
-  date: { type: Date, required: true },
+  kmEnd: { type: Number },
+  kmTotal: { type: Number },
+  fuelings: [{
+    cost: { type: Number, required: true },
+    litres: { type: Number, required: true },
+    date: { type: Date, default: Date.now }
+  }],
+  earnings: { type: Number, default: 0 },
+  status: { type: String, enum: ['open', 'closed'], default: 'open' },
+  date: { type: Date, required: true, default: Date.now },
   createdAt: { type: Date, default: Date.now },
 });
+
 
 export default mongoose.models.Ride || mongoose.model<IRide>('Ride', RideSchema);

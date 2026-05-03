@@ -2,108 +2,123 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NovoRegistro() {
-  const [formData, setFormData] = useState({
-    platform: 'Uber',
-    rides: '',
-    kmStart: '',
-    kmEnd: '',
-    fuelCost: '',
-    fuelLitres: '',
-    earnings: '',
-    date: new Date().toISOString().split('T')[0]
-  });
-
-  // Carregar rascunho ao iniciar
-  useEffect(() => {
-    const draft = localStorage.getItem('ride_draft');
-    if (draft) {
-      try {
-        setFormData(JSON.parse(draft));
-      } catch (e) {
-        console.error('Erro ao carregar rascunho:', e);
-      }
-    }
-  }, []);
-
-  // Salvar rascunho ao alterar campos
-  useEffect(() => {
-    localStorage.setItem('ride_draft', JSON.stringify(formData));
-  }, [formData]);
-
+  const [activeSession, setActiveSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  // Form states for different actions
+  const [startData, setStartData] = useState({ kmStart: '', platform: 'Uber' });
+  const [fuelData, setFuelData] = useState({ fuelCost: '', fuelLitres: '' });
+  const [finishData, setFinishData] = useState({ kmEnd: '', rides: '', earnings: '', platform: 'Uber' });
+
+  useEffect(() => {
+    fetchActiveSession();
+  }, []);
+
+  const fetchActiveSession = async () => {
+    try {
+      const res = await fetch('/api/rides?status=open');
+      const json = await res.json();
+      if (json.success && json.data.length > 0) {
+        setActiveSession(json.data[0]);
+        setFinishData(prev => ({ ...prev, platform: json.data[0].platform }));
+      } else {
+        setActiveSession(null);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar sessão ativa:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleStartShift = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validações
-    const kmStartNum = Number(formData.kmStart);
-    const kmEndNum = Number(formData.kmEnd);
-    const earningsNum = Number(formData.earnings);
-
-    if (kmEndNum <= kmStartNum) {
-      setNotification({ type: 'error', message: 'KM Final deve ser maior que KM Inicial' });
-      return;
-    }
-
-    if (earningsNum <= 0) {
-      setNotification({ type: 'error', message: 'Os ganhos devem ser maiores que zero' });
-      return;
-    }
-
     setSubmitting(true);
-    setNotification(null);
-    
     try {
-      const response = await fetch('/api/rides', {
+      const res = await fetch('/api/rides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          rides: Number(formData.rides),
-          kmStart: kmStartNum,
-          kmEnd: kmEndNum,
-          earnings: earningsNum,
-          fuelCost: formData.fuelCost ? Number(formData.fuelCost) : 0,
-          fuelLitres: formData.fuelLitres ? Number(formData.fuelLitres) : 0,
-        }),
+        body: JSON.stringify({ ...startData, action: 'start' }),
       });
-
-      if (response.ok) {
-        setNotification({ type: 'success', message: 'Registro salvo com sucesso!' });
-        localStorage.removeItem('ride_draft');
-        setFormData({
-          platform: 'Uber',
-          rides: '',
-          kmStart: formData.kmEnd, // Preencher com o último KM
-          kmEnd: '',
-          fuelCost: '',
-          fuelLitres: '',
-          earnings: '',
-          date: new Date().toISOString().split('T')[0]
-        });
-        
-        // Limpar notificação após 3 segundos
-        setTimeout(() => setNotification(null), 3000);
+      const json = await res.json();
+      if (json.success) {
+        setNotification({ type: 'success', message: 'Dia iniciado com sucesso!' });
+        fetchActiveSession();
       } else {
-        const error = await response.json();
-        setNotification({ type: 'error', message: 'Erro ao salvar: ' + error.error });
+        setNotification({ type: 'error', message: json.error });
       }
-    } catch (error) {
-      setNotification({ type: 'error', message: 'Erro na conexão com o servidor.' });
+    } catch (err) {
+      setNotification({ type: 'error', message: 'Erro na conexão.' });
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleAddFueling = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/rides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...fuelData, action: 'add_fueling' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setNotification({ type: 'success', message: 'Abastecimento registrado!' });
+        setFuelData({ fuelCost: '', fuelLitres: '' });
+        fetchActiveSession();
+      } else {
+        setNotification({ type: 'error', message: json.error });
+      }
+    } catch (err) {
+      setNotification({ type: 'error', message: 'Erro na conexão.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleFinishShift = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (Number(finishData.kmEnd) <= activeSession.kmStart) {
+      setNotification({ type: 'error', message: 'KM Final deve ser maior que KM Inicial' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/rides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...finishData, action: 'finish' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setNotification({ type: 'success', message: 'Dia finalizado e salvo com sucesso!' });
+        setActiveSession(null);
+        fetchActiveSession();
+      } else {
+        setNotification({ type: 'error', message: json.error });
+      }
+    } catch (err) {
+      setNotification({ type: 'error', message: 'Erro na conexão.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <Loader2 className="animate-spin" size={40} color="var(--primary)" />
+      </div>
+    );
+  }
 
   return (
     <div className="novo-registro">
@@ -111,8 +126,8 @@ export default function NovoRegistro() {
         <Link href="/" className="back-btn glass">
           <ChevronLeft size={20} />
         </Link>
-        <h1 className="title">Novo Registro</h1>
-        <div style={{ width: 40 }} /> {/* Spacer */}
+        <h1 className="title">Registro Diário</h1>
+        <div style={{ width: 40 }} />
       </header>
 
       <AnimatePresence>
@@ -129,182 +144,178 @@ export default function NovoRegistro() {
         )}
       </AnimatePresence>
 
-      <form onSubmit={handleSubmit} className="form-container">
-        <div className="card glass-form">
-          <div className="input-group">
-            <label>Plataforma</label>
-            <div className="platform-toggle">
-              <button 
-                type="button" 
-                className={`toggle-btn uber ${formData.platform === 'Uber' ? 'active' : ''}`}
-                onClick={() => setFormData(p => ({ ...p, platform: 'Uber' }))}
-                disabled={submitting}
-              >
-                Uber
-              </button>
-              <button 
-                type="button" 
-                className={`toggle-btn ninety-nine ${formData.platform === '99' ? 'active' : ''}`}
-                onClick={() => setFormData(p => ({ ...p, platform: '99' }))}
-                disabled={submitting}
-              >
-                99
-              </button>
-            </div>
-          </div>
-
-          <div className="input-row">
-            <div className="input-group">
-              <label><Hash size={14} /> Corridas</label>
-              <input 
-                type="number" 
-                name="rides" 
-                placeholder="0" 
-                value={formData.rides}
-                onChange={handleChange}
-                required
-                disabled={submitting}
-              />
-            </div>
-            <div className="input-group">
-              <label><DollarSign size={14} /> Ganhos</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                name="earnings" 
-                placeholder="0,00"
-                value={formData.earnings}
-                onChange={handleChange}
-                required
-                disabled={submitting}
-              />
-            </div>
-          </div>
-
-          <div className="input-row">
+      <div className="form-container">
+        {!activeSession ? (
+          <motion.form 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            onSubmit={handleStartShift} 
+            className="card animate-in"
+          >
+            <div className="status-badge start">Início do Dia</div>
+            <p className="description">Registre o KM inicial para começar a registrar sua atividade de hoje.</p>
+            
             <div className="input-group">
               <label><Navigation size={14} /> KM Inicial</label>
               <input 
                 type="number" 
-                name="kmStart" 
-                placeholder="0"
-                value={formData.kmStart}
-                onChange={handleChange}
+                placeholder="Ex: 45000"
+                value={startData.kmStart}
+                onChange={e => setStartData({...startData, kmStart: e.target.value})}
                 required
                 disabled={submitting}
               />
             </div>
-            <div className="input-group">
-              <label><Navigation size={14} /> KM Final</label>
-              <input 
-                type="number" 
-                name="kmEnd" 
-                placeholder="0"
-                value={formData.kmEnd}
-                onChange={handleChange}
-                required
-                disabled={submitting}
-              />
-            </div>
-          </div>
 
-          <div className="input-row">
-            <div className="input-group">
-              <label><Droplets size={14} /> Custo Combustível</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                name="fuelCost" 
-                placeholder="R$ 0,00"
-                value={formData.fuelCost}
-                onChange={handleChange}
-                disabled={submitting}
-              />
+            <button type="submit" className="btn-primary" disabled={submitting}>
+              {submitting ? <Loader2 className="animate-spin" /> : <Play size={18} />}
+              Iniciar Turno
+            </button>
+          </motion.form>
+        ) : (
+          <div className="active-session-flow">
+            {/* Status do Turno */}
+            <div className="card status-summary">
+              <div className="status-header">
+                <div className="status-badge open">Turno em Aberto</div>
+                <span className="date">{new Date(activeSession.date).toLocaleDateString('pt-BR')}</span>
+              </div>
+              <div className="mini-stats">
+                <div className="mini-stat">
+                  <span className="label">KM Inicial</span>
+                  <span className="value">{activeSession.kmStart}</span>
+                </div>
+                <div className="mini-stat">
+                  <span className="label">Abastecimentos</span>
+                  <span className="value">{activeSession.fuelings.length}</span>
+                </div>
+              </div>
             </div>
-            <div className="input-group">
-              <label><Droplets size={14} /> Litros Abastecidos</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                name="fuelLitres" 
-                placeholder="0.00 L"
-                value={formData.fuelLitres}
-                onChange={handleChange}
-                disabled={submitting}
-              />
-            </div>
-          </div>
 
-          <div className="input-group">
-            <label>Data</label>
-            <input 
-              type="date" 
-              name="date" 
-              value={formData.date}
-              onChange={handleChange}
-              required
-              disabled={submitting}
-            />
-          </div>
+            {/* Adicionar Abastecimento */}
+            <motion.form 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onSubmit={handleAddFueling} 
+              className="card glass"
+            >
+              <h2 className="section-title"><Droplets size={18} /> Registrar Abastecimento</h2>
+              <div className="input-row">
+                <div className="input-group">
+                  <label>Valor (R$)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    placeholder="0,00"
+                    value={fuelData.fuelCost}
+                    onChange={e => setFuelData({...fuelData, fuelCost: e.target.value})}
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+                <div className="input-group">
+                  <label>Litros</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    placeholder="0.00"
+                    value={fuelData.fuelLitres}
+                    onChange={e => setFuelData({...fuelData, fuelLitres: e.target.value})}
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+              <button type="submit" className="btn-secondary" disabled={submitting}>
+                <Plus size={18} /> Adicionar Abastecimento
+              </button>
+            </motion.form>
 
-          <motion.button 
-            whileTap={{ scale: 0.95 }}
-            type="submit" 
-            className="btn-primary submit-btn"
-            disabled={submitting}
-          >
-            {submitting ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-            {submitting ? 'Salvando...' : 'Salvar Atividade'}
-          </motion.button>
-        </div>
-      </form>
+            {/* Finalizar Dia */}
+            <motion.form 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              onSubmit={handleFinishShift} 
+              className="card"
+            >
+              <h2 className="section-title"><Check size={18} /> Finalizar Dia</h2>
+              
+              <div className="input-group">
+                <label>Plataforma Principal</label>
+                <div className="platform-toggle">
+                  <button 
+                    type="button" 
+                    className={`toggle-btn ${finishData.platform === 'Uber' ? 'active uber' : ''}`}
+                    onClick={() => setFinishData({...finishData, platform: 'Uber'})}
+                  >Uber</button>
+                  <button 
+                    type="button" 
+                    className={`toggle-btn ${finishData.platform === '99' ? 'active ninety-nine' : ''}`}
+                    onClick={() => setFinishData({...finishData, platform: '99'})}
+                  >99</button>
+                </div>
+              </div>
+
+              <div className="input-row">
+                <div className="input-group">
+                  <label><Navigation size={14} /> KM Final</label>
+                  <input 
+                    type="number" 
+                    placeholder="KM Final"
+                    value={finishData.kmEnd}
+                    onChange={e => setFinishData({...finishData, kmEnd: e.target.value})}
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+                <div className="input-group">
+                  <label><Hash size={14} /> Corridas</label>
+                  <input 
+                    type="number" 
+                    placeholder="0"
+                    value={finishData.rides}
+                    onChange={e => setFinishData({...finishData, rides: e.target.value})}
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label><DollarSign size={14} /> Total de Ganhos (R$)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  placeholder="0,00"
+                  value={finishData.earnings}
+                  onChange={e => setFinishData({...finishData, earnings: e.target.value})}
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              <button type="submit" className="btn-primary" style={{ marginTop: '10px' }} disabled={submitting}>
+                {submitting ? <Loader2 className="animate-spin" /> : <Save size={18} />}
+                Encerrar Atividade
+              </button>
+            </motion.form>
+          </div>
+        )}
+      </div>
 
       <style jsx>{`
         .novo-registro {
           display: flex;
           flex-direction: column;
-          gap: 24px;
-          position: relative;
+          gap: 20px;
         }
-
-        .notification {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 16px;
-          border-radius: 12px;
-          font-weight: 600;
-          font-size: 0.875rem;
-          margin-top: -12px;
-          box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
-
-        .notification.success {
-          background: var(--success);
-          color: white;
-        }
-
-        .notification.error {
-          background: var(--danger);
-          color: white;
-        }
-
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
         .header {
           display: flex;
-          justify-content: space-between;
           align-items: center;
-          margin-top: 10px;
+          justify-content: space-between;
+          padding-top: 10px;
         }
-
         .back-btn {
           width: 40px;
           height: 40px;
@@ -312,99 +323,122 @@ export default function NovoRegistro() {
           align-items: center;
           justify-content: center;
           border-radius: 12px;
+          color: var(--foreground);
+          text-decoration: none;
         }
-
         .title {
           font-size: 1.25rem;
-          font-weight: 700;
+          margin: 0;
         }
-
-        .glass-form {
-          border: 1px solid var(--glass-border);
-          padding: clamp(16px, 5vw, 28px);
-          background: linear-gradient(165deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        .description {
+          margin-bottom: 20px;
+          font-size: 0.9rem;
+        }
+        .section-title {
+          font-size: 1rem;
           display: flex;
-          flex-direction: column;
-          gap: 20px;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
         }
-
-        .platform-toggle {
-          display: flex;
-          gap: 12px;
-          margin-top: 8px;
-          padding: 6px;
-          background: rgba(0,0,0,0.2);
-          border-radius: 16px;
-        }
-
-        .toggle-btn {
-          flex: 1;
-          padding: 14px;
-          border-radius: 12px;
-          border: none;
-          background: transparent;
-          color: var(--text-muted);
-          font-weight: 800;
-          font-size: 0.8rem;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .toggle-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .toggle-btn.active.uber {
-          background: white;
-          color: black;
-          box-shadow: 0 4px 12px rgba(255,255,255,0.2);
-        }
-
-        .toggle-btn.active.ninety-nine {
-          background: var(--99-color);
-          color: var(--99-text);
-          box-shadow: 0 4px 12px rgba(255, 204, 0, 0.3);
-        }
-
         .input-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 16px;
+          gap: 12px;
+          margin-bottom: 16px;
         }
-
-        @media (max-width: 400px) {
-          .input-row {
-            grid-template-columns: 1fr;
-            gap: 20px;
-          }
-        }
-
-        .input-group label {
+        .notification {
           display: flex;
           align-items: center;
-          gap: 6px;
-          margin-bottom: 8px;
+          gap: 10px;
+          padding: 14px;
+          border-radius: 12px;
+          color: white;
+          font-weight: 600;
+          font-size: 0.9rem;
+        }
+        .notification.success { background: var(--success); }
+        .notification.error { background: var(--danger); }
+        
+        .status-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 20px;
           font-size: 0.75rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          margin-bottom: 12px;
         }
+        .status-badge.start { background: #dbeafe; color: #1e40af; }
+        .status-badge.open { background: #dcfce7; color: #166534; }
+        
+        .active-session-flow {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        
+        .status-summary {
+          background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+          border-color: #bfdbfe;
+        }
+        .status-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        .date { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+        .mini-stats { display: flex; gap: 24px; }
+        .mini-stat { display: flex; flex-direction: column; }
+        .mini-stat .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .mini-stat .value { font-size: 1.1rem; font-weight: 800; color: var(--primary); }
 
-        .submit-btn {
+        .platform-toggle {
+          display: flex;
+          background: #f1f5f9;
+          padding: 4px;
+          border-radius: 12px;
+          gap: 4px;
+        }
+        .toggle-btn {
+          flex: 1;
+          border: none;
+          padding: 10px;
+          border-radius: 8px;
+          background: transparent;
+          color: var(--text-muted);
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .toggle-btn.active.uber { background: black; color: white; }
+        .toggle-btn.active.ninety-nine { background: var(--99-color); color: var(--99-text); }
+
+        .btn-secondary {
           width: 100%;
-          margin-top: 12px;
-          padding: 16px;
-          font-size: 1rem;
-          box-shadow: 0 10px 20px -5px var(--primary-glow);
+          padding: 12px;
+          border-radius: 12px;
+          border: 1px dashed var(--primary);
+          background: var(--primary-glow);
+          color: var(--primary);
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
         }
+        .btn-secondary:hover { background: #dbeafe; }
 
-        .submit-btn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-          box-shadow: none;
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
         }
       `}</style>
     </div>
   );
 }
+
