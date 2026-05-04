@@ -443,6 +443,22 @@ export default function Veiculo() {
         .text-muted {
           color: var(--text-muted);
         }
+
+        @media (max-width: 480px) {
+          .vehicle-visual {
+            flex-direction: column;
+            text-align: center;
+          }
+          .vehicle-details {
+            grid-template-columns: 1fr;
+          }
+          .input-row {
+            grid-template-columns: 1fr;
+          }
+          .consumption-number {
+            font-size: 2.5rem;
+          }
+        }
       `}</style>
     </div>
   );

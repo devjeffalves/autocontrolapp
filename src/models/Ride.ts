@@ -7,7 +7,7 @@ export interface IFueling {
 }
 
 export interface IRide extends Document {
-  platform: 'Uber' | '99' | 'Both';
+  platform: 'Uber' | '99' | 'Both' | 'Passeio';
   rides: number;
   kmStart: number;
   kmEnd?: number;
@@ -20,7 +20,7 @@ export interface IRide extends Document {
 }
 
 const RideSchema: Schema = new Schema({
-  platform: { type: String, required: true, enum: ['Uber', '99', 'Both'], default: 'Uber' },
+  platform: { type: String, required: true, enum: ['Uber', '99', 'Both', 'Passeio'], default: 'Uber' },
   rides: { type: Number, default: 0 },
   kmStart: { type: Number, required: true },
   kmEnd: { type: Number },

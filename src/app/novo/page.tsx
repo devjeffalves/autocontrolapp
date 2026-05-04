@@ -167,6 +167,22 @@ export default function NovoRegistro() {
               />
             </div>
 
+            <div className="input-group">
+              <label>Tipo de Atividade</label>
+              <div className="platform-toggle">
+                <button 
+                  type="button" 
+                  className={`toggle-btn ${startData.platform !== 'Passeio' ? 'active' : ''}`}
+                  onClick={() => setStartData({...startData, platform: 'Uber'})}
+                >Trabalho</button>
+                <button 
+                  type="button" 
+                  className={`toggle-btn ${startData.platform === 'Passeio' ? 'active tour' : ''}`}
+                  onClick={() => setStartData({...startData, platform: 'Passeio'})}
+                >Passeio</button>
+              </div>
+            </div>
+
             <button type="submit" className="btn-primary" disabled={submitting}>
               {submitting ? <Loader2 className="animate-spin" /> : <Play size={18} />}
               Iniciar Turno
@@ -241,21 +257,23 @@ export default function NovoRegistro() {
             >
               <h2 className="section-title"><Check size={18} /> Finalizar Dia</h2>
               
-              <div className="input-group">
-                <label>Plataforma Principal</label>
-                <div className="platform-toggle">
-                  <button 
-                    type="button" 
-                    className={`toggle-btn ${finishData.platform === 'Uber' ? 'active uber' : ''}`}
-                    onClick={() => setFinishData({...finishData, platform: 'Uber'})}
-                  >Uber</button>
-                  <button 
-                    type="button" 
-                    className={`toggle-btn ${finishData.platform === '99' ? 'active ninety-nine' : ''}`}
-                    onClick={() => setFinishData({...finishData, platform: '99'})}
-                  >99</button>
+              {activeSession.platform !== 'Passeio' && (
+                <div className="input-group">
+                  <label>Plataforma Principal</label>
+                  <div className="platform-toggle">
+                    <button 
+                      type="button" 
+                      className={`toggle-btn ${finishData.platform === 'Uber' ? 'active uber' : ''}`}
+                      onClick={() => setFinishData({...finishData, platform: 'Uber'})}
+                    >Uber</button>
+                    <button 
+                      type="button" 
+                      className={`toggle-btn ${finishData.platform === '99' ? 'active ninety-nine' : ''}`}
+                      onClick={() => setFinishData({...finishData, platform: '99'})}
+                    >99</button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="input-row">
                 <div className="input-group">
@@ -269,31 +287,35 @@ export default function NovoRegistro() {
                     disabled={submitting}
                   />
                 </div>
+                {activeSession.platform !== 'Passeio' && (
+                  <div className="input-group">
+                    <label><Hash size={14} /> Corridas</label>
+                    <input 
+                      type="number" 
+                      placeholder="0"
+                      value={finishData.rides}
+                      onChange={e => setFinishData({...finishData, rides: e.target.value})}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {activeSession.platform !== 'Passeio' && (
                 <div className="input-group">
-                  <label><Hash size={14} /> Corridas</label>
+                  <label><DollarSign size={14} /> Total de Ganhos (R$)</label>
                   <input 
                     type="number" 
-                    placeholder="0"
-                    value={finishData.rides}
-                    onChange={e => setFinishData({...finishData, rides: e.target.value})}
+                    step="0.01" 
+                    placeholder="0,00"
+                    value={finishData.earnings}
+                    onChange={e => setFinishData({...finishData, earnings: e.target.value})}
                     required
                     disabled={submitting}
                   />
                 </div>
-              </div>
-
-              <div className="input-group">
-                <label><DollarSign size={14} /> Total de Ganhos (R$)</label>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  placeholder="0,00"
-                  value={finishData.earnings}
-                  onChange={e => setFinishData({...finishData, earnings: e.target.value})}
-                  required
-                  disabled={submitting}
-                />
-              </div>
+              )}
 
               <button type="submit" className="btn-primary" style={{ marginTop: '10px' }} disabled={submitting}>
                 {submitting ? <Loader2 className="animate-spin" /> : <Save size={18} />}
@@ -413,6 +435,7 @@ export default function NovoRegistro() {
         }
         .toggle-btn.active.uber { background: black; color: white; }
         .toggle-btn.active.ninety-nine { background: var(--99-color); color: var(--99-text); }
+        .toggle-btn.active.tour { background: var(--success); color: white; }
 
         .btn-secondary {
           width: 100%;
@@ -428,6 +451,21 @@ export default function NovoRegistro() {
           gap: 8px;
           cursor: pointer;
           transition: all 0.2s;
+        }
+
+        @media (max-width: 480px) {
+          .input-row {
+            grid-template-columns: 1fr;
+          }
+          .mini-stats {
+            gap: 16px;
+          }
+          .mini-stat .value {
+            font-size: 1rem;
+          }
+          .card {
+            padding: 16px;
+          }
         }
         .btn-secondary:hover { background: #dbeafe; }
 

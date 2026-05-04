@@ -64,8 +64,8 @@ export async function POST(request: Request) {
       
       activeSession.kmEnd = kmEnd;
       activeSession.kmTotal = kmTotal;
-      activeSession.rides = body.rides;
-      activeSession.earnings = body.earnings;
+      activeSession.rides = body.rides || 0;
+      activeSession.earnings = body.earnings || 0;
       activeSession.status = 'closed';
       activeSession.platform = body.platform || activeSession.platform;
       

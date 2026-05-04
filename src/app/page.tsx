@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
+import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -10,6 +10,8 @@ export default function Dashboard() {
   const [rides, setRides] = useState<any[]>([]);
   const [vehicle, setVehicle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -41,6 +43,45 @@ export default function Dashboard() {
     };
     fetchData();
   }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este registro?')) return;
+    
+    setIsDeleting(id);
+    try {
+      const res = await fetch(`/api/rides/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setRides(rides.filter(item => item._id !== id));
+      } else {
+        alert('Erro ao excluir: ' + data.error);
+      }
+    } catch (error) {
+      alert('Erro na requisição de exclusão');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/rides/${editingItem._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingItem),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRides(rides.map(item => item._id === editingItem._id ? data.data : item));
+        setEditingItem(null);
+      } else {
+        alert('Erro ao atualizar: ' + data.error);
+      }
+    } catch (error) {
+      alert('Erro na requisição de atualização');
+    }
+  };
 
   // Filtragem por período (apenas sessões fechadas para as estatísticas principais)
   const closedRides = rides.filter(r => r.status === 'closed');
@@ -197,7 +238,7 @@ export default function Dashboard() {
       <section className="recent-activity">
         <div className="section-header">
           <h3 className="section-title">Atividades Recentes</h3>
-          <button className="view-all">Ver tudo</button>
+          <Link href="/historico" className="view-all">Ver tudo</Link>
         </div>
         <div className="activity-list">
           <AnimatePresence mode="popLayout">
@@ -212,27 +253,144 @@ export default function Dashboard() {
               filteredRides.slice(0, 5).map((item, i) => (
                 <motion.div 
                   key={item._id || i} 
-                  className="activity-item glass"
+                  className={`activity-item glass ${isDeleting === item._id ? 'deleting' : ''}`}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ delay: i * 0.05 }}
                 >
                   <div className={`platform-badge ${item.platform?.toLowerCase() || 'uber'}`}>
                     {item.platform}
                   </div>
                   <div className="activity-info">
-                    <p className="activity-value">R$ {item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="activity-value">
+                      {item.platform === 'Passeio' 
+                        ? 'Lazer / Passeio' 
+                        : `R$ ${item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      }
+                    </p>
                     <p className="activity-meta">
                       {item.kmTotal?.toFixed(1) || 0}km • {new Date(item.date).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
-                  <ArrowUpRight size={18} className="text-muted" />
+                  <div className="activity-actions">
+                    <button className="action-btn edit" onClick={() => setEditingItem(item)}>
+                      <Pencil size={14} />
+                    </button>
+                    <button className="action-btn delete" onClick={() => handleDelete(item._id)}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </motion.div>
               ))
             )}
           </AnimatePresence>
         </div>
       </section>
+
+      {/* Modal de Edição */}
+      <AnimatePresence>
+        {editingItem && (
+          <div className="modal-overlay">
+            <motion.div 
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className="modal-content card"
+            >
+              <div className="modal-header">
+                <h3 className="modal-title">Editar Registro</h3>
+                <button className="close-btn" onClick={() => setEditingItem(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <form onSubmit={handleUpdate} className="edit-form">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Ganhos (R$)</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      value={editingItem.earnings} 
+                      onChange={e => setEditingItem({...editingItem, earnings: parseFloat(e.target.value)})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Corridas</label>
+                    <input 
+                      type="number" 
+                      value={editingItem.rides} 
+                      onChange={e => setEditingItem({...editingItem, rides: parseInt(e.target.value)})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>KM Inicial</label>
+                    <input 
+                      type="number" 
+                      value={editingItem.kmStart} 
+                      onChange={e => setEditingItem({...editingItem, kmStart: parseInt(e.target.value)})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>KM Final</label>
+                    <input 
+                      type="number" 
+                      value={editingItem.kmEnd || ''} 
+                      onChange={e => setEditingItem({...editingItem, kmEnd: parseInt(e.target.value)})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group full">
+                    <label>Tipo / Plataforma</label>
+                    <select 
+                      value={editingItem.platform} 
+                      onChange={e => setEditingItem({...editingItem, platform: e.target.value})}
+                    >
+                      <option value="Uber">Uber</option>
+                      <option value="99">99</option>
+                      <option value="Both">Ambas</option>
+                      <option value="Passeio">Passeio</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {editingItem.platform !== 'Passeio' && (
+                  <div className="form-grid" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>
+                    <div className="form-group">
+                      <label>Ganhos (R$)</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={editingItem.earnings} 
+                        onChange={e => setEditingItem({...editingItem, earnings: parseFloat(e.target.value)})}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Corridas</label>
+                      <input 
+                        type="number" 
+                        value={editingItem.rides} 
+                        onChange={e => setEditingItem({...editingItem, rides: parseInt(e.target.value)})}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                <button type="submit" className="save-btn">
+                  <Save size={18} />
+                  Salvar Alterações
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
 
       <style jsx>{`
@@ -427,6 +585,11 @@ export default function Dashboard() {
           color: var(--99-text);
         }
 
+        .platform-badge.passeio {
+          background: var(--success);
+          color: white;
+        }
+
         .activity-info {
           flex: 1;
         }
@@ -513,6 +676,167 @@ export default function Dashboard() {
         .btn-alert:hover {
           background: #1d4ed8;
           transform: translateY(-1px);
+        }
+
+        .activity-item.deleting {
+          opacity: 0.5;
+          transform: scale(0.98);
+        }
+
+        .activity-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .action-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--glass-border);
+          background: rgba(255, 255, 255, 0.5);
+          cursor: pointer;
+          transition: all 0.2s;
+          color: var(--text-muted);
+        }
+
+        .action-btn.edit:hover {
+          background: #dcfce7;
+          color: #166534;
+          border-color: #bbf7d0;
+        }
+
+        .action-btn.delete:hover {
+          background: #fee2e2;
+          color: #991b1b;
+          border-color: #fecaca;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.4);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 20px;
+        }
+
+        .modal-content {
+          width: 100%;
+          max-width: 450px;
+          padding: 24px;
+          background: white;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+
+        .modal-title {
+          font-size: 1.125rem;
+          font-weight: 700;
+        }
+
+        .close-btn {
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+        }
+
+        .edit-form {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+
+        .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .form-group.full {
+          grid-column: span 2;
+        }
+
+        .form-group label {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--text-muted);
+        }
+
+        .form-group input, .form-group select {
+          padding: 10px 12px;
+          border-radius: 8px;
+          border: 1px solid var(--glass-border);
+          background: #f8fafc;
+          font-size: 0.875rem;
+          font-weight: 600;
+        }
+
+        .save-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 12px;
+          background: var(--primary);
+          color: white;
+          border: none;
+          border-radius: 10px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .save-btn:hover {
+          filter: brightness(1.1);
+          transform: translateY(-1px);
+        }
+
+        /* Responsividade Adicional */
+        @media (max-width: 480px) {
+          .header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+          }
+          .period-selector {
+            width: 100%;
+            justify-content: space-between;
+          }
+          .period-btn {
+            flex: 1;
+            text-align: center;
+          }
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
+          .form-grid {
+            grid-template-columns: 1fr;
+          }
+          .form-group.full {
+            grid-column: span 1;
+          }
         }
       `}</style>
     </div>
