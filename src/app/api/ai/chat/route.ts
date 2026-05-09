@@ -4,11 +4,10 @@ import dbConnect from '@/lib/mongodb';
 import Ride from '@/models/Ride';
 import Vehicle from '@/models/Vehicle';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.GEMINI_API_KEY) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
       return NextResponse.json({ 
         success: false, 
         error: 'GEMINI_API_KEY não configurada no servidor.' 
@@ -19,13 +18,12 @@ export async function POST(request: NextRequest) {
 
     await dbConnect();
     
-    // Buscar contexto do usuário (últimos registros e veículo)
+    // Buscar contexto do usuário
     const [rides, vehicle] = await Promise.all([
       Ride.find({ status: 'closed' }).sort({ date: -1 }).limit(10),
       Vehicle.findOne({})
     ]);
 
-    // Criar o prompt de sistema com os dados do usuário
     const statsContext = rides.map(r => ({
       data: r.date.toLocaleDateString('pt-BR'),
       ganhos: r.earnings,
@@ -51,6 +49,7 @@ export async function POST(request: NextRequest) {
       5. Sempre responda em Português do Brasil.
     `;
 
+    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const chat = model.startChat({
