@@ -4,12 +4,12 @@ import Ride from '@/models/Ride';
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
     const body = await request.json();
-    const { id } = params;
+    const { id } = await params;
 
     // Se estiver atualizando kmEnd, recalcular kmTotal
     if (body.kmEnd !== undefined && body.kmStart !== undefined) {
@@ -38,11 +38,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = params;
+    const { id } = await params;
 
     const deletedRide = await Ride.findByIdAndDelete(id);
 
