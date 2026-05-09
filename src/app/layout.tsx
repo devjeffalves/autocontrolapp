@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
+import AIAssistant from "@/components/AIAssistant";
 
 export const metadata: Metadata = {
   title: "AutoControl - Gestão para Motoristas",
@@ -35,6 +36,7 @@ export default function RootLayout({
           {children}
           <div style={{ height: "100px" }} /> {/* Spacer for BottomNav */}
         </main>
+        <AIAssistant />
         <BottomNav />
       </body>
     </html>

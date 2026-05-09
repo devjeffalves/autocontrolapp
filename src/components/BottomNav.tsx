@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, PlusCircle, History, Car } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, History, Car, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const BottomNav = () => {
@@ -12,6 +12,7 @@ const BottomNav = () => {
   const navItems = [
     { name: 'Início', href: '/', icon: LayoutDashboard },
     { name: 'Novo', href: '/novo', icon: PlusCircle },
+    { name: 'IA', href: 'ai', icon: Sparkles, isAction: true },
     { name: 'Histórico', href: '/historico', icon: History },
     { name: 'Veículo', href: '/veiculo', icon: Car },
   ];
@@ -21,6 +22,23 @@ const BottomNav = () => {
       <div className="bottom-nav-container glass">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
+          
+          if (item.isAction) {
+            return (
+              <button 
+                key={item.href} 
+                className="nav-item ai-trigger"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-ai-assistant'))}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                <div className="icon-wrapper">
+                  <item.icon size={28} className="ai-pulse-icon" />
+                </div>
+                <span>{item.name}</span>
+              </button>
+            );
+          }
+
           return (
             <Link key={item.href} href={item.href} className={`nav-item ${isActive ? 'active' : ''}`}>
               <div className="icon-wrapper">
