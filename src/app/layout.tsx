@@ -5,7 +5,6 @@ import BottomNav from "@/components/BottomNav";
 export const metadata: Metadata = {
   title: "AutoControl - Gestão para Motoristas",
   description: "Gerencie suas corridas, quilometragem e consumo de combustível com facilidade.",
-  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -28,6 +27,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
+      <head>
+        <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
+      </head>
       <body>
         <main className="container safe-area-top">
           {children}
