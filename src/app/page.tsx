@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff } from 'lucide-react';
+import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -68,6 +68,38 @@ export default function Dashboard() {
     } finally {
       setAiLoading(false);
     }
+  };
+
+  const speakMessage = (text: string) => {
+    if (!('speechSynthesis' in window)) {
+      alert('Seu navegador não suporta leitura de texto.');
+      return;
+    }
+
+    // Limpar texto: remover emojis, asteriscos de markdown e outros caracteres estranhos para a fala
+    const cleanText = text
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F1E6}-\u{1F1FF}]/gu, '') // Remove Emojis
+      .replace(/\*\*|\*/g, '') // Remove Markdown (negrito/itálico)
+      .replace(/#/g, '') // Remove hashtags/títulos
+      .trim();
+
+    // Cancelar qualquer fala em andamento
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'pt-BR';
+    
+    const voices = window.speechSynthesis.getVoices();
+    const femaleVoice = voices.find(v => 
+      v.lang.includes('pt') && 
+      (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('google'))
+    );
+    
+    if (femaleVoice) utterance.voice = femaleVoice;
+    utterance.pitch = 1.1;
+    utterance.rate = 1.05; // Levemente mais rápido para um ritmo mais natural
+
+    window.speechSynthesis.speak(utterance);
   };
 
   useEffect(() => {
@@ -536,8 +568,15 @@ export default function Dashboard() {
                   </div>
                 )}
                 {chatHistory.map((msg, i) => (
-                  <div key={i} className={`chat-bubble ${msg.role}`}>
-                    {msg.content}
+                  <div key={i} className={`chat-bubble-container ${msg.role}`}>
+                    <div className={`chat-bubble ${msg.role}`}>
+                      {msg.content}
+                    </div>
+                    {msg.role === 'assistant' && (
+                      <button className="speak-btn" onClick={() => speakMessage(msg.content)}>
+                        <Volume2 size={16} />
+                      </button>
+                    )}
                   </div>
                 ))}
                 {aiLoading && (
@@ -1120,11 +1159,49 @@ export default function Dashboard() {
         .ai-chat-messages {
           flex: 1;
           overflow-y: auto;
-          padding: 20px;
+          padding: 16px;
           display: flex;
           flex-direction: column;
           gap: 16px;
           background: #f8fafc;
+          padding-bottom: 30px;
+        }
+
+        .chat-bubble-container {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          max-width: 90%;
+        }
+
+        .chat-bubble-container.user {
+          align-self: flex-end;
+          flex-direction: row-reverse;
+        }
+
+        .chat-bubble-container.assistant {
+          align-self: flex-start;
+        }
+
+        .speak-btn {
+          margin-top: 8px;
+          background: white;
+          border: 1px solid #e2e8f0;
+          color: var(--primary);
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .speak-btn:hover {
+          background: var(--primary-glow);
+          transform: scale(1.1);
         }
 
         .ai-welcome {
@@ -1246,6 +1323,33 @@ export default function Dashboard() {
         }
 
         @media (max-width: 480px) {
+          .ai-chat-drawer {
+            max-width: 100%;
+          }
+          
+          .ai-chat-header {
+            padding: 16px;
+          }
+
+          .ai-chat-messages {
+            padding: 12px;
+          }
+
+          .ai-chat-input {
+            padding: 12px;
+            padding-bottom: env(safe-area-inset-bottom, 12px);
+          }
+
+          .chat-bubble {
+            font-size: 0.85rem;
+            padding: 10px 14px;
+          }
+
+          .ai-fab {
+            bottom: 90px;
+            right: 16px;
+          }
+
           .header {
             flex-direction: column;
             align-items: flex-start;
