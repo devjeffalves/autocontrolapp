@@ -317,6 +317,27 @@ export default function NovoRegistro() {
                 </div>
               )}
 
+              {finishData.kmEnd && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="shift-preview glass"
+                >
+                  <div className="preview-item">
+                    <span>KM Total:</span>
+                    <strong>{Number(finishData.kmEnd) - activeSession.kmStart} km</strong>
+                  </div>
+                  {activeSession.platform !== 'Passeio' && (
+                    <div className="preview-item">
+                      <span>Lucro Estimado:</span>
+                      <strong style={{ color: 'var(--success)' }}>
+                        R$ {(Number(finishData.earnings) - activeSession.fuelings.reduce((acc: number, f: any) => acc + (f.cost || 0), 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </strong>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
               <button type="submit" className="btn-primary" style={{ marginTop: '10px' }} disabled={submitting}>
                 {submitting ? <Loader2 className="animate-spin" /> : <Save size={18} />}
                 Encerrar Atividade
@@ -451,6 +472,25 @@ export default function NovoRegistro() {
           gap: 8px;
           cursor: pointer;
           transition: all 0.2s;
+        }
+
+        .shift-preview {
+          margin-top: 10px;
+          padding: 12px;
+          border-radius: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          background: rgba(255, 255, 255, 0.5);
+        }
+        .preview-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 0.85rem;
+        }
+        .preview-item strong {
+          font-size: 1rem;
         }
 
         @media (max-width: 480px) {

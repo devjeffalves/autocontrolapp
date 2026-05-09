@@ -44,6 +44,22 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
+  const handleCancelSession = async (id: string) => {
+    if (!confirm('Deseja realmente cancelar esta sessão? Todos os dados não salvos serão perdidos.')) return;
+    
+    try {
+      const res = await fetch(`/api/rides/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setRides(rides.filter(item => item._id !== id));
+      } else {
+        alert('Erro ao cancelar: ' + data.error);
+      }
+    } catch (error) {
+      alert('Erro na requisição');
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este registro?')) return;
     
@@ -106,14 +122,22 @@ export default function Dashboard() {
   const totalEarnings = filteredRides.reduce((acc, curr) => acc + (curr.earnings || 0), 0);
   const totalKm = filteredRides.reduce((acc, curr) => acc + (curr.kmTotal || 0), 0);
   
-  // Cálculo de rendimento real (km/L) - soma todos os abastecimentos de todas as corridas
-  const totalLitres = closedRides.reduce((acc, curr) => {
+  // Cálculo de custo de combustível no período filtrado
+  const totalFuelCost = filteredRides.reduce((acc, curr) => {
+    const rideCost = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.cost || 0), 0) || 0;
+    return acc + rideCost;
+  }, 0);
+
+  const netProfit = totalEarnings - totalFuelCost;
+  const profitPerKm = totalKm > 0 ? netProfit / totalKm : 0;
+  
+  // Cálculo de rendimento real (km/L) - soma todos os abastecimentos das corridas filtradas
+  const totalLitres = filteredRides.reduce((acc, curr) => {
     const rideLitres = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
     return acc + rideLitres;
   }, 0);
 
-  const totalKmForFuel = closedRides.reduce((acc, curr) => {
-    // Só conta KM de corridas que tiveram abastecimento ou que queremos considerar no cálculo
+  const totalKmForFuel = filteredRides.reduce((acc, curr) => {
     const hasFuel = curr.fuelings && curr.fuelings.length > 0;
     return hasFuel ? acc + (curr.kmTotal || 0) : acc;
   }, 0);
@@ -124,28 +148,36 @@ export default function Dashboard() {
   
   const stats = [
     { 
-      label: 'Ganhos Totais', 
-      value: `R$ ${totalEarnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
-      icon: Wallet, 
-      trend: '+12%', 
-      trendUp: true,
+      label: 'Lucro Real', 
+      value: `R$ ${netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
+      icon: TrendingUp, 
+      trend: `${totalEarnings > 0 ? ((netProfit / totalEarnings) * 100).toFixed(0) : 0}% margem`, 
+      trendUp: netProfit > 0,
       color: 'var(--success)'
     },
     { 
-      label: 'Quilometragem', 
-      value: `${totalKm.toFixed(1)} km`, 
-      icon: Navigation, 
-      trend: '+5%', 
-      trendUp: true,
+      label: 'Ganhos', 
+      value: `R$ ${totalEarnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
+      icon: Wallet, 
+      trend: `R$ ${totalFuelCost.toFixed(2)} gastos`, 
+      trendUp: false,
       color: 'var(--primary)'
     },
     { 
-      label: 'Consumo Médio', 
+      label: 'Km Rodados', 
+      value: `${totalKm.toFixed(1)} km`, 
+      icon: Navigation, 
+      trend: `R$ ${profitPerKm.toFixed(2)}/km`, 
+      trendUp: true,
+      color: 'var(--warning)'
+    },
+    { 
+      label: 'Consumo Real', 
       value: `${realAvgConsumption} km/L`, 
       icon: Fuel, 
-      trend: '-2%', 
-      trendUp: false,
-      color: 'var(--warning)'
+      trend: period, 
+      trendUp: true,
+      color: '#8b5cf6'
     },
   ];
 
@@ -179,10 +211,13 @@ export default function Dashboard() {
             <div className="pulse-icon" />
             <div>
               <h3 className="alert-title">Turno em andamento</h3>
-              <p className="alert-desc">Iniciado às {new Date(activeSession.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+              <p className="alert-desc">Iniciado às {new Date(activeSession.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • {activeSession.kmStart} KM</p>
             </div>
           </div>
-          <Link href="/novo" className="btn-alert">Continuar</Link>
+          <div className="alert-actions">
+            <button onClick={() => handleCancelSession(activeSession._id)} className="btn-cancel">Cancelar</button>
+            <Link href="/novo" className="btn-alert">Continuar</Link>
+          </div>
         </motion.div>
       )}
 
@@ -666,16 +701,43 @@ export default function Dashboard() {
           background: #2563eb;
           color: white;
           text-decoration: none;
-          padding: 8px 16px;
-          border-radius: 10px;
+          padding: 10px 20px;
+          border-radius: 12px;
           font-size: 0.875rem;
           font-weight: 700;
           transition: all 0.2s;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .btn-alert:hover {
           background: #1d4ed8;
           transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+        }
+
+        .alert-actions {
+          display: flex;
+          gap: 10px;
+        }
+
+        .btn-cancel {
+          background: #f1f5f9;
+          color: #64748b;
+          border: 1px solid #e2e8f0;
+          padding: 10px 16px;
+          border-radius: 12px;
+          font-size: 0.875rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-cancel:hover {
+          background: #fee2e2;
+          color: #ef4444;
+          border-color: #fecaca;
         }
 
         .activity-item.deleting {
