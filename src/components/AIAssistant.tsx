@@ -12,11 +12,21 @@ export default function AIAssistant() {
   const [isAiListening, setIsAiListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
 
-  // Escutar evento global para abrir o chat
+  // Escutar evento global para abrir o chat e travar scroll
   useEffect(() => {
-    const handleOpenAI = () => setShowAIChat(true);
+    const handleOpenAI = () => {
+      setShowAIChat(true);
+      document.body.style.overflow = 'hidden';
+    };
+    const handleCloseAI = () => {
+      setShowAIChat(false);
+      document.body.style.overflow = 'auto';
+    };
     window.addEventListener('open-ai-assistant', handleOpenAI);
-    return () => window.removeEventListener('open-ai-assistant', handleOpenAI);
+    return () => {
+      window.removeEventListener('open-ai-assistant', handleOpenAI);
+      document.body.style.overflow = 'auto';
+    };
   }, []);
 
   const startAiListening = () => {
@@ -107,7 +117,10 @@ export default function AIAssistant() {
                     <span className="online-status">Ativa agora</span>
                   </div>
                 </div>
-                <button onClick={() => setShowAIChat(false)} className="close-ai"><X size={20} /></button>
+                <button onClick={() => {
+                  setShowAIChat(false);
+                  document.body.style.overflow = 'auto';
+                }} className="close-ai"><X size={20} /></button>
               </div>
 
               <div className="ai-chat-messages">
@@ -152,8 +165,12 @@ export default function AIAssistant() {
                     <motion.button 
                       type="button" 
                       className={`mic-btn-ai ${isAiListening ? 'listening' : ''}`}
-                      onClick={startAiListening}
-                      whileTap={{ y: -50 }} // Efeito de subir ao clicar (estilo WhatsApp)
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        startAiListening();
+                      }}
+                      whileTap={{ scale: 0.9 }} // Apenas escala, sem mover Y
                     >
                       <Mic size={20} />
                     </motion.button>
@@ -224,12 +241,14 @@ export default function AIAssistant() {
         .chat-bubble.assistant { background: white; color: #1e293b; border-bottom-left-radius: 4px; border: 1px solid #e2e8f0; }
 
         .ai-chat-input {
-          padding: 16px 20px 32px 20px; /* Padding extra para mobile */
+          padding: 16px 20px 32px 20px;
           background: white;
           border-top: 1px solid #e2e8f0;
           display: flex;
           align-items: center;
           gap: 12px;
+          position: relative;
+          z-index: 10001;
         }
 
         .input-wrapper { flex: 1; }
@@ -240,11 +259,12 @@ export default function AIAssistant() {
           border: 1px solid transparent;
           border-radius: 20px;
           font-size: 1rem;
+          color: #1e293b;
         }
 
         .mic-btn-ai, .send-btn-ai, .delete-voice-btn {
-          width: 48px;
-          height: 48px;
+          width: 50px;
+          height: 50px;
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -252,6 +272,8 @@ export default function AIAssistant() {
           border: none;
           cursor: pointer;
           transition: all 0.2s;
+          touch-action: manipulation;
+          z-index: 10002;
         }
 
         .mic-btn-ai { background: #f1f5f9; color: #3b82f6; }
