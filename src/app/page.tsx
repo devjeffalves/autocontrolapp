@@ -1078,7 +1078,7 @@ export default function Dashboard() {
           right: 20px;
           width: 56px;
           height: 56px;
-          border-radius: 50%;
+          border-radius: 50% !important;
           background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
           color: white;
           border: none;
