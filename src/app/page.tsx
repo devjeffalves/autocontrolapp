@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save } from 'lucide-react';
+import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -12,6 +12,63 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  // AI Assistant States
+  const [showAIChat, setShowAIChat] = useState(false);
+  const [aiMessage, setAiMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [isAiListening, setIsAiListening] = useState(false);
+
+  const startAiListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Reconhecimento de voz não suportado neste navegador.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.onstart = () => setIsAiListening(true);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setAiMessage(transcript);
+      // Enviar automaticamente após um pequeno delay para o usuário ver o texto
+      setTimeout(() => {
+        handleSendMessageDirect(transcript);
+      }, 500);
+    };
+    recognition.onerror = () => setIsAiListening(false);
+    recognition.onend = () => setIsAiListening(false);
+    recognition.start();
+  };
+
+  const handleSendMessageDirect = async (messageText: string) => {
+    if (!messageText.trim() || aiLoading) return;
+
+    const userMsg = { role: 'user', content: messageText };
+    setChatHistory(prev => [...prev, userMsg]);
+    setAiMessage('');
+    setAiLoading(true);
+
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageText, history: chatHistory }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setChatHistory(prev => [...prev, { role: 'assistant', content: data.text }]);
+      } else {
+        setChatHistory(prev => [...prev, { role: 'assistant', content: 'Ops: ' + data.error }]);
+      }
+    } catch (error) {
+      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Erro de conexão.' }]);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -97,6 +154,11 @@ export default function Dashboard() {
     } catch (error) {
       alert('Erro na requisição de atualização');
     }
+  };
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    handleSendMessageDirect(aiMessage);
   };
 
   // Filtragem por período (apenas sessões fechadas para as estatísticas principais)
@@ -420,6 +482,87 @@ export default function Dashboard() {
                 <button type="submit" className="save-btn">
                   <Save size={18} />
                   Salvar Alterações
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Botão Flutuante IA */}
+      <motion.button 
+        className="ai-fab"
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setShowAIChat(true)}
+      >
+        <Sparkles size={24} />
+      </motion.button>
+
+      {/* Chat da IA */}
+      <AnimatePresence>
+        {showAIChat && (
+          <div className="ai-modal-overlay">
+            <motion.div 
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="ai-chat-drawer"
+            >
+              <div className="ai-chat-header">
+                <div className="ai-title">
+                  <div className="ai-icon-pulse">
+                    <Bot size={20} />
+                  </div>
+                  <div>
+                    <h3>Assistente de Bordo</h3>
+                    <span className="online-status">Gemini AI Ativa</span>
+                  </div>
+                </div>
+                <button onClick={() => setShowAIChat(false)} className="close-ai"><X size={20} /></button>
+              </div>
+
+              <div className="ai-chat-messages">
+                {chatHistory.length === 0 && (
+                  <div className="ai-welcome">
+                    <Sparkles size={40} className="text-primary" />
+                    <h4>Como posso ajudar hoje?</h4>
+                    <p>Eu analiso seus registros para sugerir melhorias no seu lucro.</p>
+                    <div className="ai-suggestions">
+                      <button onClick={() => { setAiMessage('Como melhorar meu lucro?'); handleSendMessage(); }}>Como melhorar meu lucro?</button>
+                      <button onClick={() => { setAiMessage('Minha média de consumo está boa?'); handleSendMessage(); }}>Analisar meu consumo</button>
+                    </div>
+                  </div>
+                )}
+                {chatHistory.map((msg, i) => (
+                  <div key={i} className={`chat-bubble ${msg.role}`}>
+                    {msg.content}
+                  </div>
+                ))}
+                {aiLoading && (
+                  <div className="chat-bubble assistant loading">
+                    <Loader2 className="animate-spin" size={16} /> Analisando dados...
+                  </div>
+                )}
+              </div>
+
+              <form className="ai-chat-input" onSubmit={handleSendMessage}>
+                <button 
+                  type="button" 
+                  className={`mic-btn-ai ${isAiListening ? 'listening' : ''}`}
+                  onClick={startAiListening}
+                >
+                  {isAiListening ? <Mic className="animate-pulse" /> : <Mic size={18} />}
+                </button>
+                <input 
+                  placeholder="Fale ou digite algo..." 
+                  value={aiMessage}
+                  onChange={e => setAiMessage(e.target.value)}
+                  disabled={aiLoading}
+                />
+                <button type="submit" disabled={aiLoading || !aiMessage.trim()}>
+                  <Send size={18} />
                 </button>
               </form>
             </motion.div>
@@ -876,6 +1019,232 @@ export default function Dashboard() {
         }
 
         /* Responsividade Adicional */
+        /* AI Assistant Styles */
+        .ai-fab {
+          position: fixed;
+          bottom: 100px;
+          right: 20px;
+          width: 56px;
+          height: 56px;
+          border-radius: 20px;
+          background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+          color: white;
+          border: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
+          cursor: pointer;
+          z-index: 900;
+        }
+
+        .ai-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.3);
+          backdrop-filter: blur(8px);
+          z-index: 2000;
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .ai-chat-drawer {
+          width: 100%;
+          max-width: 400px;
+          height: 100%;
+          background: white;
+          display: flex;
+          flex-direction: column;
+          box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+        }
+
+        .ai-chat-header {
+          padding: 20px;
+          border-bottom: 1px solid #f1f5f9;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #f8fafc;
+        }
+
+        .ai-title {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .ai-title h3 {
+          font-size: 1rem;
+          font-weight: 700;
+          margin: 0;
+        }
+
+        .online-status {
+          font-size: 0.7rem;
+          color: var(--success);
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .online-status::before {
+          content: '';
+          width: 6px;
+          height: 6px;
+          background: var(--success);
+          border-radius: 50%;
+        }
+
+        .ai-icon-pulse {
+          width: 40px;
+          height: 40px;
+          background: var(--primary-glow);
+          color: var(--primary);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .close-ai {
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+        }
+
+        .ai-chat-messages {
+          flex: 1;
+          overflow-y: auto;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          background: #f8fafc;
+        }
+
+        .ai-welcome {
+          text-align: center;
+          margin-top: 40px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .ai-suggestions {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          width: 100%;
+          margin-top: 20px;
+        }
+
+        .ai-suggestions button {
+          padding: 12px;
+          background: white;
+          border: 1px solid var(--glass-border);
+          border-radius: 12px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: var(--primary);
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .ai-suggestions button:hover {
+          background: var(--primary-glow);
+          border-color: var(--primary);
+        }
+
+        .chat-bubble {
+          max-width: 85%;
+          padding: 12px 16px;
+          border-radius: 16px;
+          font-size: 0.9rem;
+          line-height: 1.5;
+        }
+
+        .chat-bubble.user {
+          align-self: flex-end;
+          background: var(--primary);
+          color: white;
+          border-bottom-right-radius: 4px;
+        }
+
+        .chat-bubble.assistant {
+          align-self: flex-start;
+          background: white;
+          color: #1e293b;
+          border: 1px solid #e2e8f0;
+          border-bottom-left-radius: 4px;
+        }
+
+        .chat-bubble.loading {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--text-muted);
+        }
+
+        .ai-chat-input {
+          padding: 20px;
+          background: white;
+          border-top: 1px solid #f1f5f9;
+          display: flex;
+          gap: 12px;
+        }
+
+        .ai-chat-input input {
+          flex: 1;
+          padding: 12px 16px;
+          background: #f1f5f9;
+          border: none;
+          border-radius: 12px;
+          font-size: 0.9rem;
+        }
+
+        .ai-chat-input button {
+          width: 44px;
+          height: 44px;
+          background: var(--primary);
+          color: white;
+          border: none;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .ai-chat-input button:disabled {
+          opacity: 0.5;
+        }
+
+        .ai-chat-input button.mic-btn-ai {
+          background: #f1f5f9;
+          color: var(--primary);
+        }
+
+        .ai-chat-input button.mic-btn-ai.listening {
+          background: #fee2e2;
+          color: #ef4444;
+          box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+        }
+
+        .animate-pulse {
+          animation: pulse-mic 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse-mic {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: .5; transform: scale(1.1); }
+        }
+
         @media (max-width: 480px) {
           .header {
             flex-direction: column;

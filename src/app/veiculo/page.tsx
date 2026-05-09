@@ -2,17 +2,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Car, Settings, Fuel, Activity, PenLine, Save, X } from 'lucide-react';
+import { Car, Settings, Fuel, Activity, PenLine, Save, X, Plus, Trash2, Camera, Calendar, ChevronRight } from 'lucide-react';
 
 export default function Veiculo() {
   const [isEditing, setIsEditing] = useState(false);
-  const [vehicle, setVehicle] = useState({
+  const [vehicle, setVehicle] = useState<any>({
     model: 'Carregando...',
     plate: '---',
     fuelType: '---',
     avgConsumption: 0,
     currentKm: 0,
+    reminders: [],
+    oilChecks: [],
   });
+
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [newReminder, setNewReminder] = useState({ title: '', dueInfo: '', status: 'ok' });
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,27 +65,67 @@ export default function Veiculo() {
     if (!isEditing) return;
 
     const timer = setTimeout(() => {
-      saveToDb();
+      handleSave(vehicle, false);
     }, 1500);
 
     return () => clearTimeout(timer);
   }, [vehicle]);
 
-  const saveToDb = async () => {
+  const handleSave = async (updatedVehicle = vehicle, shouldClose = true) => {
     try {
-      await fetch('/api/vehicle', {
+      const res = await fetch('/api/vehicle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(vehicle),
+        body: JSON.stringify(updatedVehicle),
       });
+      const data = await res.json();
+      if (data.success) {
+        setVehicle(data.data);
+      }
     } catch (error) {
-      console.error('Erro no auto-save:', error);
+      console.error('Erro ao salvar:', error);
     }
+    if (shouldClose) setIsEditing(false);
   };
 
-  const handleSave = async () => {
-    await saveToDb();
-    setIsEditing(false);
+  const addReminder = () => {
+    const updated = {
+      ...vehicle,
+      reminders: [...(vehicle.reminders || []), newReminder]
+    };
+    handleSave(updated);
+    setShowReminderModal(false);
+    setNewReminder({ title: '', dueInfo: '', status: 'ok' });
+  };
+
+  const deleteReminder = (index: number) => {
+    const updatedReminders = [...vehicle.reminders];
+    updatedReminders.splice(index, 1);
+    const updated = { ...vehicle, reminders: updatedReminders };
+    handleSave(updated);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    // Simulação de upload transformando em Base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const newCheck = {
+        date: new Date(),
+        km: vehicle.currentKm,
+        imageUrl: reader.result as string
+      };
+      const updated = {
+        ...vehicle,
+        oilChecks: [newCheck, ...(vehicle.oilChecks || [])].slice(0, 5) // Mantém os últimos 5
+      };
+      handleSave(updated);
+      setIsUploading(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -205,22 +251,112 @@ export default function Veiculo() {
       </section>
 
       <section className="maintenance-list">
-        <h3 className="section-title">Lembretes</h3>
-        <div className="maintenance-item card">
-          <div className="maintenance-info">
-            <p className="maintenance-name">Troca de Óleo</p>
-            <p className="maintenance-due">Em 2.500 km</p>
-          </div>
-          <div className="maintenance-status urgent">Atenção</div>
+        <div className="section-header">
+          <h3 className="section-title">Lembretes de Manutenção</h3>
+          <button className="add-btn" onClick={() => setShowReminderModal(true)}>
+            <Plus size={16} />
+          </button>
         </div>
-        <div className="maintenance-item card">
-          <div className="maintenance-info">
-            <p className="maintenance-name">Calibragem Pneus</p>
-            <p className="maintenance-due">Toda segunda-feira</p>
-          </div>
-          <div className="maintenance-status">Ok</div>
+        
+        {vehicle.reminders?.length === 0 ? (
+          <p className="empty-text">Nenhum lembrete cadastrado.</p>
+        ) : (
+          vehicle.reminders?.map((rem: any, i: number) => (
+            <div key={i} className="maintenance-item card">
+              <div className="maintenance-info">
+                <p className="maintenance-name">{rem.title}</p>
+                <p className="maintenance-due">{rem.dueInfo}</p>
+              </div>
+              <div className="maintenance-actions">
+                <div className={`maintenance-status ${rem.status}`}>{rem.status === 'ok' ? 'Em dia' : 'Atenção'}</div>
+                <button className="delete-mini" onClick={() => deleteReminder(i)}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </section>
+
+      <section className="oil-tracker card glass">
+        <div className="section-header">
+          <h3 className="section-title">Nível de Óleo</h3>
+          <label className="upload-label">
+            <Camera size={18} />
+            <input type="file" accept="image/*" onChange={handleImageUpload} hidden disabled={isUploading} />
+          </label>
+        </div>
+        
+        <div className="oil-history">
+          {isUploading && <div className="uploading-state"><Activity className="animate-pulse" /> Enviando...</div>}
+          
+          {vehicle.oilChecks?.length === 0 ? (
+            <p className="empty-text" style={{ textAlign: 'center', padding: '10px' }}>Nenhuma foto registrada.</p>
+          ) : (
+            <div className="oil-grid">
+              {vehicle.oilChecks?.map((check: any, i: number) => (
+                <div key={i} className="oil-check-card">
+                  <div className="oil-img-container">
+                    <img src={check.imageUrl} alt="Nível de óleo" />
+                  </div>
+                  <div className="oil-meta">
+                    <span className="oil-date">{new Date(check.date).toLocaleDateString('pt-BR')}</span>
+                    <span className="oil-km">{check.km} km</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
+
+      {/* Modal de Lembrete */}
+      <AnimatePresence>
+        {showReminderModal && (
+          <div className="modal-overlay">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="modal-content card"
+            >
+              <div className="modal-header">
+                <h3>Novo Lembrete</h3>
+                <button onClick={() => setShowReminderModal(false)}><X size={20} /></button>
+              </div>
+              <div className="edit-form">
+                <div className="input-group">
+                  <label>O que lembrar?</label>
+                  <input 
+                    placeholder="Ex: Troca de Óleo" 
+                    value={newReminder.title}
+                    onChange={e => setNewReminder({...newReminder, title: e.target.value})}
+                  />
+                </div>
+                <div className="input-group">
+                  <label>Quando?</label>
+                  <input 
+                    placeholder="Ex: Em 5000km ou Todo mês" 
+                    value={newReminder.dueInfo}
+                    onChange={e => setNewReminder({...newReminder, dueInfo: e.target.value})}
+                  />
+                </div>
+                <div className="input-group">
+                  <label>Status</label>
+                  <select 
+                    value={newReminder.status}
+                    onChange={e => setNewReminder({...newReminder, status: e.target.value as any})}
+                  >
+                    <option value="ok">Normal</option>
+                    <option value="urgent">Urgente</option>
+                  </select>
+                </div>
+                <button className="btn-primary" onClick={addReminder}>Adicionar</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <style jsx>{`
         .veiculo-page {
@@ -387,12 +523,6 @@ export default function Veiculo() {
           text-transform: uppercase;
         }
 
-        .maintenance-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
         .section-header {
           display: flex;
           justify-content: space-between;
@@ -408,40 +538,161 @@ export default function Veiculo() {
           color: var(--text-muted);
         }
 
-        .maintenance-item {
+        .maintenance-list {
           display: flex;
-          justify-content: space-between;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .add-btn {
+          background: var(--primary-glow);
+          color: var(--primary);
+          border: 1px solid var(--primary);
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          display: flex;
           align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .empty-text {
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          margin: 10px 0;
+        }
+
+        .maintenance-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .delete-mini {
+          background: none;
+          border: none;
+          color: #ef4444;
+          cursor: pointer;
+          padding: 4px;
+        }
+
+        .oil-tracker {
           padding: 16px;
         }
 
-        .maintenance-name {
+        .upload-label {
+          width: 40px;
+          height: 40px;
+          background: var(--primary);
+          color: white;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .uploading-state {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 0.8rem;
+          color: var(--primary);
+          justify-content: center;
+          padding: 10px;
+        }
+
+        .oil-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+          gap: 12px;
+          margin-top: 10px;
+        }
+
+        .oil-check-card {
+          background: white;
+          border-radius: 12px;
+          overflow: hidden;
+          border: 1px solid var(--glass-border);
+        }
+
+        .oil-img-container {
+          aspect-ratio: 1;
+          width: 100%;
+          overflow: hidden;
+        }
+
+        .oil-img-container img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .oil-meta {
+          padding: 6px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          font-size: 0.65rem;
           font-weight: 700;
-          color: #1e293b;
         }
 
-        .maintenance-due {
-          font-size: 0.75rem;
+        .oil-date { color: var(--text-muted); }
+        .oil-km { color: var(--primary); }
+
+        /* Modal Styles */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.4);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 20px;
+        }
+
+        .modal-content {
+          width: 100%;
+          max-width: 400px;
+          padding: 20px;
+          background: white;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+          font-size: 1rem;
+          font-weight: 700;
+        }
+
+        .modal-header button {
+          background: none;
+          border: none;
           color: var(--text-muted);
+          cursor: pointer;
         }
 
-        .maintenance-status {
-          font-size: 0.7rem;
-          font-weight: 800;
-          color: var(--success);
-          padding: 4px 10px;
-          background: #d1fae5;
-          border-radius: 20px;
-          text-transform: uppercase;
-        }
-
-        .maintenance-status.urgent {
-          color: #b45309;
-          background: #fef3c7;
-        }
-
-        .text-muted {
-          color: var(--text-muted);
+        .btn-primary {
+          background: var(--primary);
+          color: white;
+          border: none;
+          padding: 12px;
+          border-radius: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          margin-top: 10px;
         }
 
         @media (max-width: 480px) {

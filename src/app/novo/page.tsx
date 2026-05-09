@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus } from 'lucide-react';
+import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus, Mic, MicOff } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NovoRegistro() {
@@ -15,6 +15,83 @@ export default function NovoRegistro() {
   const [startData, setStartData] = useState({ kmStart: '', platform: 'Uber' });
   const [fuelData, setFuelData] = useState({ fuelCost: '', fuelLitres: '' });
   const [finishData, setFinishData] = useState({ kmEnd: '', rides: '', earnings: '', platform: 'Uber' });
+
+  // Voice recognition states
+  const [isListening, setIsListening] = useState(false);
+  const [voiceFeedback, setVoiceFeedback] = useState('');
+
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setNotification({ type: 'error', message: 'Reconhecimento de voz não suportado neste navegador.' });
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setVoiceFeedback('Ouvindo...');
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript.toLowerCase();
+      setVoiceFeedback(transcript);
+      processVoiceCommand(transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Erro no reconhecimento:', event.error);
+      setIsListening(false);
+      setVoiceFeedback('Erro ao ouvir.');
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
+
+  const processVoiceCommand = (text: string) => {
+    // Regex para capturar números
+    const numbers = text.match(/\d+/g);
+    
+    if (text.includes('km inicial') && numbers) {
+      setStartData(prev => ({ ...prev, kmStart: numbers[0] }));
+      setNotification({ type: 'success', message: `KM Inicial definido para ${numbers[0]}` });
+    } 
+    else if (text.includes('abastecimento') && numbers) {
+      if (numbers.length >= 2) {
+        setFuelData({ fuelCost: numbers[0], fuelLitres: numbers[1] });
+        setNotification({ type: 'success', message: `Abastecimento: R$ ${numbers[0]} e ${numbers[1]}L` });
+      } else if (numbers.length === 1) {
+        setFuelData(prev => ({ ...prev, fuelCost: numbers[0] }));
+        setNotification({ type: 'success', message: `Valor do abastecimento: R$ ${numbers[0]}` });
+      }
+    } 
+    else if (text.includes('km final') && numbers) {
+      setFinishData(prev => ({ ...prev, kmEnd: numbers[0] }));
+      setNotification({ type: 'success', message: `KM Final definido para ${numbers[0]}` });
+    }
+    else if (text.includes('ganho') && numbers) {
+      setFinishData(prev => ({ ...prev, earnings: numbers[0] }));
+      setNotification({ type: 'success', message: `Ganhos definidos para R$ ${numbers[0]}` });
+    }
+    else if (text.includes('corridas') && numbers) {
+      setFinishData(prev => ({ ...prev, rides: numbers[0] }));
+      setNotification({ type: 'success', message: `${numbers[0]} corridas registradas` });
+    }
+    else if (text.includes('plataforma')) {
+      if (text.includes('uber')) setStartData(prev => ({...prev, platform: 'Uber'}));
+      if (text.includes('99')) setStartData(prev => ({...prev, platform: '99'}));
+      if (text.includes('passeio')) setStartData(prev => ({...prev, platform: 'Passeio'}));
+      setNotification({ type: 'success', message: 'Plataforma alterada' });
+    }
+  };
 
   useEffect(() => {
     fetchActiveSession();
@@ -127,8 +204,20 @@ export default function NovoRegistro() {
           <ChevronLeft size={20} />
         </Link>
         <h1 className="title">Registro Diário</h1>
-        <div style={{ width: 40 }} />
+        <button 
+          className={`voice-btn glass ${isListening ? 'listening' : ''}`}
+          onClick={startListening}
+          title="Comando de Voz"
+        >
+          {isListening ? <Mic className="animate-pulse" /> : <Mic size={20} />}
+        </button>
       </header>
+
+      {voiceFeedback && (
+        <div className="voice-feedback">
+          <p>Você disse: "<span>{voiceFeedback}</span>"</p>
+        </div>
+      )}
 
       <AnimatePresence>
         {notification && (
@@ -172,7 +261,7 @@ export default function NovoRegistro() {
               <div className="platform-toggle">
                 <button 
                   type="button" 
-                  className={`toggle-btn ${startData.platform !== 'Passeio' ? 'active' : ''}`}
+                  className={`toggle-btn ${startData.platform !== 'Passeio' ? 'active uber' : ''}`}
                   onClick={() => setStartData({...startData, platform: 'Uber'})}
                 >Trabalho</button>
                 <button 
@@ -508,6 +597,42 @@ export default function NovoRegistro() {
           }
         }
         .btn-secondary:hover { background: #dbeafe; }
+
+        .voice-btn {
+          width: 40px;
+          height: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 12px;
+          color: var(--primary);
+          transition: all 0.3s;
+        }
+        .voice-btn.listening {
+          background: #ef4444;
+          color: white;
+          box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+        }
+        .voice-feedback {
+          background: rgba(255, 255, 255, 0.8);
+          padding: 8px 16px;
+          border-radius: 10px;
+          font-size: 0.8rem;
+          text-align: center;
+          border: 1px dashed var(--primary);
+          margin-bottom: 10px;
+        }
+        .voice-feedback span {
+          font-weight: 700;
+          color: var(--primary);
+        }
+        .animate-pulse {
+          animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: .5; }
+        }
 
         @keyframes spin {
           to { transform: rotate(360deg); }

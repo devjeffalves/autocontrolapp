@@ -137,9 +137,16 @@ export default function Historico() {
                     </p>
                   </div>
                   <div className="history-earnings">
-                    <p className="earning-value">
-                      {item.platform === 'Passeio' ? 'Lazer' : `R$ ${item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                    </p>
+                    <div className="earnings-group">
+                      <p className="earning-value">
+                        {item.platform === 'Passeio' ? 'Lazer' : `R$ ${item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                      </p>
+                      {item.platform !== 'Passeio' && (
+                        <p className={`profit-badge ${((item.earnings || 0) - (item.fuelings?.reduce((acc: number, f: any) => acc + (f.cost || 0), 0) || 0)) >= 0 ? 'positive' : 'negative'}`}>
+                          L: R$ {((item.earnings || 0) - (item.fuelings?.reduce((acc: number, f: any) => acc + (f.cost || 0), 0) || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      )}
+                    </div>
                     <ChevronRight size={18} className="text-muted" />
                   </div>
                 </div>
@@ -429,15 +436,35 @@ export default function Historico() {
           color: var(--text-muted);
         }
 
-        .earning-value {
-          font-weight: 700;
-          font-size: 1rem;
-        }
-
         .history-earnings {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 12px;
+        }
+
+        .earnings-group {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 4px;
+        }
+
+        .profit-badge {
+          font-size: 0.65rem;
+          font-weight: 800;
+          padding: 2px 6px;
+          border-radius: 4px;
+          text-transform: uppercase;
+        }
+
+        .profit-badge.positive {
+          background: #dcfce7;
+          color: #166534;
+        }
+
+        .profit-badge.negative {
+          background: #fee2e2;
+          color: #991b1b;
         }
 
         .text-muted {
