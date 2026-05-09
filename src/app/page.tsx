@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2 } from 'lucide-react';
+import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [isAiListening, setIsAiListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
 
   const startAiListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -70,21 +71,26 @@ export default function Dashboard() {
     }
   };
 
-  const speakMessage = (text: string) => {
+  const speakMessage = (text: string, msgId: string) => {
     if (!('speechSynthesis' in window)) {
       alert('Seu navegador não suporta leitura de texto.');
       return;
     }
 
-    // Limpar texto: remover emojis, asteriscos de markdown e outros caracteres estranhos para a fala
-    const cleanText = text
-      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F1E6}-\u{1F1FF}]/gu, '') // Remove Emojis
-      .replace(/\*\*|\*/g, '') // Remove Markdown (negrito/itálico)
-      .replace(/#/g, '') // Remove hashtags/títulos
-      .trim();
+    if (isSpeaking === msgId) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(null);
+      return;
+    }
 
-    // Cancelar qualquer fala em andamento
     window.speechSynthesis.cancel();
+
+    const cleanText = text
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F1E6}-\u{1F1FF}]/gu, '') // Emojis
+      .replace(/\*\*|\*/g, '') // Markdown
+      .replace(/[#/_\\-]/g, ' ') // Caracteres especiais por espaço
+      .replace(/\s+/g, ' ') // Espaços duplos
+      .trim();
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'pt-BR';
@@ -92,12 +98,16 @@ export default function Dashboard() {
     const voices = window.speechSynthesis.getVoices();
     const femaleVoice = voices.find(v => 
       v.lang.includes('pt') && 
-      (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('google'))
+      (v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('female'))
     );
     
     if (femaleVoice) utterance.voice = femaleVoice;
-    utterance.pitch = 1.1;
-    utterance.rate = 1.05; // Levemente mais rápido para um ritmo mais natural
+    utterance.pitch = 1.15;
+    utterance.rate = 1.25; // Velocidade mais natural e amigável
+
+    utterance.onstart = () => setIsSpeaking(msgId);
+    utterance.onend = () => setIsSpeaking(null);
+    utterance.onerror = () => setIsSpeaking(null);
 
     window.speechSynthesis.speak(utterance);
   };
@@ -573,8 +583,11 @@ export default function Dashboard() {
                       {msg.content}
                     </div>
                     {msg.role === 'assistant' && (
-                      <button className="speak-btn" onClick={() => speakMessage(msg.content)}>
-                        <Volume2 size={16} />
+                      <button 
+                        className={`speak-btn ${isSpeaking === `msg-${i}` ? 'speaking' : ''}`} 
+                        onClick={() => speakMessage(msg.content, `msg-${i}`)}
+                      >
+                        {isSpeaking === `msg-${i}` ? <Square size={16} fill="currentColor" /> : <Volume2 size={16} />}
                       </button>
                     )}
                   </div>
@@ -1065,7 +1078,7 @@ export default function Dashboard() {
           right: 20px;
           width: 56px;
           height: 56px;
-          border-radius: 20px;
+          border-radius: 50%;
           background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
           color: white;
           border: none;
@@ -1204,6 +1217,12 @@ export default function Dashboard() {
           transform: scale(1.1);
         }
 
+        .speak-btn.speaking {
+          background: #fee2e2;
+          color: #ef4444;
+          border-color: #fecaca;
+        }
+
         .ai-welcome {
           text-align: center;
           margin-top: 40px;
@@ -1324,11 +1343,19 @@ export default function Dashboard() {
 
         @media (max-width: 480px) {
           .ai-chat-drawer {
-            max-width: 100%;
+            width: 100%;
+            max-width: 100vw;
+            right: 0;
+            border-radius: 0;
+          }
+
+          .ai-modal-overlay {
+            padding: 0;
           }
           
           .ai-chat-header {
             padding: 16px;
+            border-radius: 0;
           }
 
           .ai-chat-messages {
