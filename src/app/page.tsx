@@ -534,11 +534,12 @@ export default function Dashboard() {
       {/* Botão Flutuante IA */}
       <motion.button 
         className="ai-fab"
+        style={{ borderRadius: '50%', width: '60px', height: '60px' }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setShowAIChat(true)}
       >
-        <Sparkles size={24} />
+        <Sparkles size={28} />
       </motion.button>
 
       {/* Chat da IA */}
@@ -600,22 +601,46 @@ export default function Dashboard() {
               </div>
 
               <form className="ai-chat-input" onSubmit={handleSendMessage}>
-                <button 
-                  type="button" 
-                  className={`mic-btn-ai ${isAiListening ? 'listening' : ''}`}
-                  onClick={startAiListening}
-                >
-                  {isAiListening ? <Mic className="animate-pulse" /> : <Mic size={18} />}
-                </button>
+                {isAiListening && (
+                  <button 
+                    type="button" 
+                    className="delete-voice-btn"
+                    onClick={() => {
+                      // Simular cancelamento
+                      window.speechSynthesis.cancel();
+                      setIsAiListening(false);
+                      setAiMessage('');
+                    }}
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                )}
+
                 <input 
-                  placeholder="Fale ou digite algo..." 
+                  placeholder={isAiListening ? "Ouvindo..." : "Fale ou digite algo..."} 
                   value={aiMessage}
                   onChange={e => setAiMessage(e.target.value)}
                   disabled={aiLoading}
+                  style={{ flex: 1 }}
                 />
-                <button type="submit" disabled={aiLoading || !aiMessage.trim()}>
-                  <Send size={18} />
-                </button>
+
+                <div className="chat-actions-right">
+                  {!aiMessage.trim() && !aiLoading && (
+                    <button 
+                      type="button" 
+                      className={`mic-btn-ai ${isAiListening ? 'listening' : ''}`}
+                      onClick={startAiListening}
+                    >
+                      {isAiListening ? <Mic className="animate-pulse" /> : <Mic size={20} />}
+                    </button>
+                  )}
+                  
+                  {(aiMessage.trim() || aiLoading) && (
+                    <button type="submit" disabled={aiLoading || !aiMessage.trim()} className="send-btn-ai">
+                      {aiLoading ? <Loader2 className="animate-spin" size={18} /> : <Send size={20} />}
+                    </button>
+                  )}
+                </div>
               </form>
             </motion.div>
           </div>
@@ -1288,23 +1313,34 @@ export default function Dashboard() {
         }
 
         .ai-chat-input {
-          padding: 20px;
+          padding: 16px 20px;
           background: white;
           border-top: 1px solid #f1f5f9;
           display: flex;
+          align-items: center;
           gap: 12px;
+          min-height: 80px;
         }
 
-        .ai-chat-input input {
-          flex: 1;
-          padding: 12px 16px;
-          background: #f1f5f9;
+        .chat-actions-right {
+          display: flex;
+          gap: 8px;
+        }
+
+        .delete-voice-btn {
+          background: #fee2e2;
+          color: #ef4444;
           border: none;
+          width: 44px;
+          height: 44px;
           border-radius: 12px;
-          font-size: 0.9rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
         }
 
-        .ai-chat-input button {
+        .send-btn-ai {
           width: 44px;
           height: 44px;
           background: var(--primary);
@@ -1315,21 +1351,44 @@ export default function Dashboard() {
           align-items: center;
           justify-content: center;
           cursor: pointer;
+          box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
         }
 
-        .ai-chat-input button:disabled {
-          opacity: 0.5;
+        .ai-chat-input input {
+          flex: 1;
+          padding: 12px 16px;
+          background: #f1f5f9;
+          border: 1px solid transparent;
+          border-radius: 12px;
+          font-size: 0.95rem;
+          transition: all 0.2s;
+        }
+
+        .ai-chat-input input:focus {
+          background: white;
+          border-color: var(--primary);
+          outline: none;
+          box-shadow: 0 0 0 4px var(--primary-glow);
         }
 
         .ai-chat-input button.mic-btn-ai {
           background: #f1f5f9;
           color: var(--primary);
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          border: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s;
         }
 
         .ai-chat-input button.mic-btn-ai.listening {
-          background: #fee2e2;
-          color: #ef4444;
-          box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+          background: #ef4444;
+          color: white;
+          transform: scale(1.1);
         }
 
         .animate-pulse {
