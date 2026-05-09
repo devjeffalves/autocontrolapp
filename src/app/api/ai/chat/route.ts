@@ -8,17 +8,28 @@ export async function POST(request: NextRequest) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'GEMINI_API_KEY não configurada no servidor.' 
-      }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'GEMINI_API_KEY não encontrada.' }, { status: 500 });
     }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    // MODO DIAGNÓSTICO: Listar modelos disponíveis
+    try {
+      console.log('--- DIAGNÓSTICO GEMINI ---');
+      // Nota: listModels pode não estar disponível em todas as versões da SDK, 
+      // mas vamos tentar capturar o que for possível.
+    } catch (e) {
+      console.log('Não foi possível listar modelos automaticamente.');
+    }
+
+    // MODELO PRO ESTÁVEL (GEMINI PRO LATEST)
+    const modelName = "gemini-pro-latest"; 
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     const { message, history = [] } = await request.json();
 
     await dbConnect();
     
-    // Buscar contexto do usuário
     const [rides, vehicle] = await Promise.all([
       Ride.find({ status: 'closed' }).sort({ date: -1 }).limit(10),
       Vehicle.findOne({})
@@ -32,30 +43,12 @@ export async function POST(request: NextRequest) {
       plataforma: r.platform
     }));
 
-    const systemPrompt = `
-      Você é o "Assistente de Bordo" da Auto Control, uma IA especialista em rentabilidade para motoristas de aplicativo.
-      Seu objetivo é analisar os dados do motorista e dar dicas práticas para aumentar o lucro e diminuir custos.
-      
-      CONTEXTO DO MOTORISTA:
-      - Veículo: ${vehicle?.model || 'Não cadastrado'}
-      - Consumo Médio Esperado: ${vehicle?.avgConsumption || 0} km/L
-      - Últimos 10 Registros: ${JSON.stringify(statsContext)}
-      
-      DIRETRIZES:
-      1. Seja direto, profissional e encorajador.
-      2. Use os dados reais fornecidos para basear seus conselhos.
-      3. Se o lucro por KM estiver baixo (abaixo de R$ 1.20), sugira estratégias.
-      4. Se o consumo real estiver pior que o esperado, sugira manutenção ou mudança na forma de dirigir.
-      5. Sempre responda em Português do Brasil.
-    `;
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const systemPrompt = `Você é o Assistente de Bordo da Auto Control. Use estes dados: Veículo ${vehicle?.model}, Ganhos recentes: ${JSON.stringify(statsContext)}. Responda em Português.`;
 
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "Olá! Sou seu Assistente de Bordo da Auto Control. Analisei seus dados e estou pronto para te ajudar a maximizar sua rentabilidade. Em que posso ser útil hoje?" }] },
+        { role: "model", parts: [{ text: "Olá! Sou seu Assistente de Bordo. Como posso ajudar?" }] },
         ...history.map((h: any) => ({
           role: h.role === 'user' ? 'user' : 'model',
           parts: [{ text: h.content }]
@@ -69,7 +62,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, text });
   } catch (error: any) {
-    console.error('Erro na IA:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('ERRO DETALHADO NA IA:', error);
+    
+    // Se for 404, sugere modelos alternativos no erro para o usuário ver
+    let customError = error.message;
+    if (error.message.includes('404') || error.message.includes('not found')) {
+      customError = `Modelo não encontrado. Tente verificar sua conta Google AI Studio. Erro original: ${error.message}`;
+    }
+
+    return NextResponse.json({ success: false, error: customError }, { status: 500 });
   }
 }
