@@ -424,6 +424,8 @@ export default function Dashboard() {
               ))
             )}
           </AnimatePresence>
+    
+
         </div>
       </section>
 
@@ -527,10 +529,16 @@ export default function Dashboard() {
                 </button>
               </form>
             </motion.div>
-              </AnimatePresence>
-
-      <style jsx>{`)}
+          </div>
+        )}
       </AnimatePresence>
+ 
+
+
+ 
+
+ 
+
 
 
       <style jsx>{`
