@@ -125,8 +125,8 @@ export default function Historico() {
                 </div>
                 <div className="history-main">
                   <div className="history-info">
-                    <div className={`platform-tag ${item.platform?.toLowerCase() || 'uber'}`}>
-                      {item.platform === 'Both' ? 'Ambas' : item.platform}
+                    <div className={`platform-tag ${item.platform?.toLowerCase() === 'passeio' ? 'passeio' : 'aplicativos'}`}>
+                      {item.platform}
                     </div>
                     <p className="history-meta">
                       {item.platform === 'Passeio' 
@@ -142,8 +142,8 @@ export default function Historico() {
                         {item.platform === 'Passeio' ? 'Lazer' : `R$ ${item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                       </p>
                       {item.platform !== 'Passeio' && (
-                        <p className={`profit-badge ${((item.earnings || 0) - (item.fuelings?.reduce((acc: number, f: any) => acc + (f.cost || 0), 0) || 0)) >= 0 ? 'positive' : 'negative'}`}>
-                          L: R$ {((item.earnings || 0) - (item.fuelings?.reduce((acc: number, f: any) => acc + (f.cost || 0), 0) || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        <p className="profit-badge positive">
+                          Ganhos
                         </p>
                       )}
                     </div>
@@ -218,38 +218,13 @@ export default function Historico() {
                       value={editingItem.platform} 
                       onChange={e => setEditingItem({...editingItem, platform: e.target.value})}
                     >
-                      <option value="Uber">Uber</option>
-                      <option value="99">99</option>
-                      <option value="Both">Ambas</option>
+                      <option value="Aplicativos">Aplicativos</option>
                       <option value="Passeio">Passeio</option>
                     </select>
                   </div>
                 </div>
                 
-                {editingItem.platform !== 'Passeio' && (
-                  <div className="form-grid" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>
-                    <div className="form-group">
-                      <label>Ganhos (R$)</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        value={editingItem.earnings} 
-                        onChange={e => setEditingItem({...editingItem, earnings: parseFloat(e.target.value)})}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Corridas</label>
-                      <input 
-                        type="number" 
-                        value={editingItem.rides} 
-                        onChange={e => setEditingItem({...editingItem, rides: parseInt(e.target.value)})}
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
-                
+
                 <button type="submit" className="save-btn">
                   <Save size={18} />
                   Salvar Alterações
@@ -415,16 +390,12 @@ export default function Historico() {
           text-transform: uppercase;
         }
 
-        .platform-tag.uber {
+        .platform-tag.aplicativos {
           background: #000;
           color: #fff;
           border: 1px solid rgba(255,255,255,0.1);
         }
 
-        .platform-tag.99 {
-          background: var(--99-color);
-          color: var(--99-text);
-        }
 
         .platform-tag.passeio {
           background: var(--success);

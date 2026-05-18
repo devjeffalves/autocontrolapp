@@ -226,16 +226,24 @@ export default function Dashboard() {
   const totalEarnings = filteredRides.reduce((acc, curr) => acc + (curr.earnings || 0), 0);
   const totalKm = filteredRides.reduce((acc, curr) => acc + (curr.kmTotal || 0), 0);
   
-  // Cálculo de custo de combustível no período filtrado
+  // Cálculo de custo de combustível no período filtrado (para exibir como gasto real, se necessário)
   const totalFuelCost = filteredRides.reduce((acc, curr) => {
     const rideCost = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.cost || 0), 0) || 0;
     return acc + rideCost;
   }, 0);
 
-  const netProfit = totalEarnings - totalFuelCost;
-  const profitPerKm = totalKm > 0 ? netProfit / totalKm : 0;
-  
-  // Cálculo de rendimento real (km/L) - soma todos os abastecimentos das corridas filtradas
+  // Calcula o preço médio do combustível baseado em todo o histórico
+  let totalFuelCostForAvg = 0;
+  let totalLitresForAvg = 0;
+  rides.forEach(r => {
+    r.fuelings?.forEach((f: any) => {
+      totalFuelCostForAvg += (f.cost || 0);
+      totalLitresForAvg += (f.litres || 0);
+    });
+  });
+  const avgFuelPrice = totalLitresForAvg > 0 ? (totalFuelCostForAvg / totalLitresForAvg) : 5.50;
+
+  // Cálculo de rendimento real (km/L) - soma todos os abastecimentos
   const totalLitres = filteredRides.reduce((acc, curr) => {
     const rideLitres = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
     return acc + rideLitres;
@@ -246,9 +254,17 @@ export default function Dashboard() {
     return hasFuel ? acc + (curr.kmTotal || 0) : acc;
   }, 0);
   
-  const realAvgConsumption = totalLitres > 0 
-    ? (totalKmForFuel / totalLitres).toFixed(2) 
-    : (vehicle?.avgConsumption || 0).toFixed(1);
+  const realAvgConsumptionNum = totalLitres > 0 
+    ? (totalKmForFuel / totalLitres) 
+    : (vehicle?.avgConsumption || 10);
+    
+  const realAvgConsumption = realAvgConsumptionNum.toFixed(1);
+
+  // Custo estimado de combustível para a distância percorrida no período
+  const estimatedFuelCost = totalKm > 0 ? (totalKm / realAvgConsumptionNum) * avgFuelPrice : 0;
+  
+  const netProfit = totalEarnings - estimatedFuelCost;
+  const profitPerKm = totalKm > 0 ? netProfit / totalKm : 0;
   
   const stats = [
     { 
@@ -263,7 +279,7 @@ export default function Dashboard() {
       label: 'Ganhos', 
       value: `R$ ${totalEarnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 
       icon: Wallet, 
-      trend: `R$ ${totalFuelCost.toFixed(2)} gastos`, 
+      trend: `R$ ${estimatedFuelCost.toFixed(2)} custo estimado`, 
       trendUp: false,
       color: 'var(--primary)'
     },
@@ -398,7 +414,7 @@ export default function Dashboard() {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <div className={`platform-badge ${item.platform?.toLowerCase() || 'uber'}`}>
+                  <div className={`platform-badge ${item.platform?.toLowerCase() === 'passeio' ? 'passeio' : 'aplicativos'}`}>
                     {item.platform}
                   </div>
                   <div className="activity-info">
@@ -491,38 +507,13 @@ export default function Dashboard() {
                       value={editingItem.platform} 
                       onChange={e => setEditingItem({...editingItem, platform: e.target.value})}
                     >
-                      <option value="Uber">Uber</option>
-                      <option value="99">99</option>
-                      <option value="Both">Ambas</option>
+                      <option value="Aplicativos">Aplicativos</option>
                       <option value="Passeio">Passeio</option>
                     </select>
                   </div>
                 </div>
                 
-                {editingItem.platform !== 'Passeio' && (
-                  <div className="form-grid" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' }}>
-                    <div className="form-group">
-                      <label>Ganhos (R$)</label>
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        value={editingItem.earnings} 
-                        onChange={e => setEditingItem({...editingItem, earnings: parseFloat(e.target.value)})}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Corridas</label>
-                      <input 
-                        type="number" 
-                        value={editingItem.rides} 
-                        onChange={e => setEditingItem({...editingItem, rides: parseInt(e.target.value)})}
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
-                
+
                 <button type="submit" className="save-btn">
                   <Save size={18} />
                   Salvar Alterações
@@ -722,16 +713,12 @@ export default function Dashboard() {
           text-transform: uppercase;
         }
 
-        .platform-badge.uber {
-          background: var(--uber-color);
-          color: var(--uber-text);
+        .platform-badge.aplicativos {
+          background: #000;
+          color: #fff;
           border: 1px solid rgba(255,255,255,0.2);
         }
 
-        .platform-badge.99 {
-          background: var(--99-color);
-          color: var(--99-text);
-        }
 
         .platform-badge.passeio {
           background: var(--success);

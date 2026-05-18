@@ -12,9 +12,9 @@ export default function NovoRegistro() {
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   // Form states for different actions
-  const [startData, setStartData] = useState({ kmStart: '', platform: 'Uber' });
+  const [startData, setStartData] = useState({ kmStart: '', platform: 'Aplicativos' });
   const [fuelData, setFuelData] = useState({ fuelCost: '', fuelLitres: '' });
-  const [finishData, setFinishData] = useState({ kmEnd: '', rides: '', earnings: '', platform: 'Uber' });
+  const [finishData, setFinishData] = useState({ kmEnd: '', rides: '', earnings: '', platform: 'Aplicativos' });
 
   // Voice recognition states
   const [isListening, setIsListening] = useState(false);
@@ -57,39 +57,122 @@ export default function NovoRegistro() {
   };
 
   const processVoiceCommand = (text: string) => {
-    // Regex para capturar números
-    const numbers = text.match(/\d+/g);
+    let understood = false;
+    let msg: string[] = [];
+    const normalized = text.toLowerCase();
     
-    if (text.includes('km inicial') && numbers) {
-      setStartData(prev => ({ ...prev, kmStart: numbers[0] }));
-      setNotification({ type: 'success', message: `KM Inicial definido para ${numbers[0]}` });
-    } 
-    else if (text.includes('abastecimento') && numbers) {
-      if (numbers.length >= 2) {
-        setFuelData({ fuelCost: numbers[0], fuelLitres: numbers[1] });
-        setNotification({ type: 'success', message: `Abastecimento: R$ ${numbers[0]} e ${numbers[1]}L` });
-      } else if (numbers.length === 1) {
-        setFuelData(prev => ({ ...prev, fuelCost: numbers[0] }));
-        setNotification({ type: 'success', message: `Valor do abastecimento: R$ ${numbers[0]}` });
+    // Separa tokens para buscar números próximos a palavras-chave
+    const tokens = normalized.split(/\s+/);
+    
+    const findNumberNear = (keywords: string[]) => {
+      for (const kw of keywords) {
+        const index = tokens.findIndex(t => t.includes(kw));
+        if (index !== -1) {
+          // Procura um número num raio de 2 palavras
+          for (let i = Math.max(0, index - 2); i <= Math.min(tokens.length - 1, index + 2); i++) {
+            const match = tokens[i].match(/\d+(?:[.,]\d+)?/);
+            if (match) {
+              const val = match[0].replace(',', '.');
+              // Marca como usado para não ser pego por outra regra
+              tokens[i] = tokens[i].replace(/\d+(?:[.,]\d+)?/, 'USED');
+              return val;
+            }
+          }
+        }
       }
-    } 
-    else if (text.includes('km final') && numbers) {
-      setFinishData(prev => ({ ...prev, kmEnd: numbers[0] }));
-      setNotification({ type: 'success', message: `KM Final definido para ${numbers[0]}` });
+      return null;
+    };
+
+    // 1. Abastecimento (Processado primeiro para não roubar os 'reais' dos ganhos)
+    if (normalized.includes('abastec') || normalized.includes('gasolina') || normalized.includes('etanol') || normalized.includes('posto')) {
+       const litrosVal = findNumberNear(['litro', 'l']);
+       const valorVal = findNumberNear(['real', 'reais', 'r$', 'abastec', 'coloquei', 'botei']);
+       
+       if (valorVal && litrosVal) {
+         setFuelData({ fuelCost: valorVal, fuelLitres: litrosVal });
+         msg.push(`Abast: R$${valorVal} / ${litrosVal}L`);
+         understood = true;
+       } else if (valorVal) {
+         setFuelData(prev => ({ ...prev, fuelCost: valorVal }));
+         msg.push(`Abast: R$${valorVal}`);
+         understood = true;
+       } else {
+         // Fallback se falou os números soltos
+         const remMatches = tokens.join(' ').match(/\d+(?:[.,]\d+)?/g);
+         if (remMatches && remMatches.length >= 2) {
+           setFuelData({ fuelCost: remMatches[0].replace(',', '.'), fuelLitres: remMatches[1].replace(',', '.') });
+           msg.push(`Abast: R$${remMatches[0]} / ${remMatches[1]}L`);
+           understood = true;
+         } else if (remMatches && remMatches.length === 1) {
+           setFuelData(prev => ({ ...prev, fuelCost: remMatches[0].replace(',', '.') }));
+           msg.push(`Abast: R$${remMatches[0]}`);
+           understood = true;
+         }
+       }
     }
-    else if (text.includes('ganho') && numbers) {
-      setFinishData(prev => ({ ...prev, earnings: numbers[0] }));
-      setNotification({ type: 'success', message: `Ganhos definidos para R$ ${numbers[0]}` });
+
+    // 2. Corridas
+    const ridesVal = findNumberNear(['corrida', 'viage']);
+    if (ridesVal) {
+      setFinishData(prev => ({ ...prev, rides: ridesVal }));
+      msg.push(`${ridesVal} corridas`);
+      understood = true;
     }
-    else if (text.includes('corridas') && numbers) {
-      setFinishData(prev => ({ ...prev, rides: numbers[0] }));
-      setNotification({ type: 'success', message: `${numbers[0]} corridas registradas` });
+
+    // 3. Ganhos
+    const earningsVal = findNumberNear(['real', 'reais', 'r$', 'ganho', 'faturei', 'rendeu', 'fiz', 'total']);
+    if (earningsVal) {
+      setFinishData(prev => ({ ...prev, earnings: earningsVal }));
+      msg.push(`Ganhos: R$${earningsVal}`);
+      understood = true;
     }
-    else if (text.includes('plataforma')) {
-      if (text.includes('uber')) setStartData(prev => ({...prev, platform: 'Uber'}));
-      if (text.includes('99')) setStartData(prev => ({...prev, platform: '99'}));
-      if (text.includes('passeio')) setStartData(prev => ({...prev, platform: 'Passeio'}));
-      setNotification({ type: 'success', message: 'Plataforma alterada' });
+
+    // 4. KM Inicial
+    const kmStartVal = findNumberNear(['inicial', 'começ', 'inici']);
+    if (kmStartVal) {
+      setStartData(prev => ({ ...prev, kmStart: kmStartVal }));
+      msg.push(`KM Inic: ${kmStartVal}`);
+      understood = true;
+    }
+
+    // 5. KM Final
+    const kmEndVal = findNumberNear(['final', 'termin', 'parar', 'parei', 'fechar', 'fechei']);
+    if (kmEndVal) {
+      setFinishData(prev => ({ ...prev, kmEnd: kmEndVal }));
+      msg.push(`KM Fin: ${kmEndVal}`);
+      understood = true;
+    }
+
+    // 6. Plataforma
+    if (normalized.includes('passeio') || normalized.includes('lazer')) {
+      setStartData(prev => ({...prev, platform: 'Passeio'}));
+      msg.push('Plat: Passeio');
+      understood = true;
+    } else if (normalized.includes('aplicativo') || normalized.includes('app') || normalized.includes('uber') || normalized.includes('99')) {
+      setStartData(prev => ({...prev, platform: 'Aplicativos'}));
+      msg.push('Plat: Aplicativos');
+      understood = true;
+    }
+
+    // 7. Fallback KM genérico
+    if (!understood && normalized.includes('km')) {
+       const kmVal = findNumberNear(['km', 'quilometragem']);
+       if (kmVal) {
+         if (!activeSession) {
+           setStartData(prev => ({ ...prev, kmStart: kmVal }));
+           msg.push(`KM Inic: ${kmVal}`);
+         } else {
+           setFinishData(prev => ({ ...prev, kmEnd: kmVal }));
+           msg.push(`KM Fin: ${kmVal}`);
+         }
+         understood = true;
+       }
+    }
+
+    if (understood) {
+      setNotification({ type: 'success', message: `✅ ${msg.join(' | ')}` });
+    } else {
+      setNotification({ type: 'error', message: 'Não entendi os valores. Fale algo como "Fiz 150 reais e 20 corridas"' });
     }
   };
 
@@ -261,8 +344,8 @@ export default function NovoRegistro() {
               <div className="platform-toggle">
                 <button 
                   type="button" 
-                  className={`toggle-btn ${startData.platform !== 'Passeio' ? 'active uber' : ''}`}
-                  onClick={() => setStartData({...startData, platform: 'Uber'})}
+                  className={`toggle-btn ${startData.platform !== 'Passeio' ? 'active aplicativos' : ''}`}
+                  onClick={() => setStartData({...startData, platform: 'Aplicativos'})}
                 >Trabalho</button>
                 <button 
                   type="button" 
@@ -346,23 +429,7 @@ export default function NovoRegistro() {
             >
               <h2 className="section-title"><Check size={18} /> Finalizar Dia</h2>
               
-              {activeSession.platform !== 'Passeio' && (
-                <div className="input-group">
-                  <label>Plataforma Principal</label>
-                  <div className="platform-toggle">
-                    <button 
-                      type="button" 
-                      className={`toggle-btn ${finishData.platform === 'Uber' ? 'active uber' : ''}`}
-                      onClick={() => setFinishData({...finishData, platform: 'Uber'})}
-                    >Uber</button>
-                    <button 
-                      type="button" 
-                      className={`toggle-btn ${finishData.platform === '99' ? 'active ninety-nine' : ''}`}
-                      onClick={() => setFinishData({...finishData, platform: '99'})}
-                    >99</button>
-                  </div>
-                </div>
-              )}
+
 
               <div className="input-row">
                 <div className="input-group">
@@ -416,14 +483,7 @@ export default function NovoRegistro() {
                     <span>KM Total:</span>
                     <strong>{Number(finishData.kmEnd) - activeSession.kmStart} km</strong>
                   </div>
-                  {activeSession.platform !== 'Passeio' && (
-                    <div className="preview-item">
-                      <span>Lucro Estimado:</span>
-                      <strong style={{ color: 'var(--success)' }}>
-                        R$ {(Number(finishData.earnings) - activeSession.fuelings.reduce((acc: number, f: any) => acc + (f.cost || 0), 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </strong>
-                    </div>
-                  )}
+
                 </motion.div>
               )}
 
@@ -543,8 +603,7 @@ export default function NovoRegistro() {
           font-weight: 700;
           cursor: pointer;
         }
-        .toggle-btn.active.uber { background: black; color: white; }
-        .toggle-btn.active.ninety-nine { background: var(--99-color); color: var(--99-text); }
+        .toggle-btn.active.aplicativos { background: black; color: white; }
         .toggle-btn.active.tour { background: var(--success); color: white; }
 
         .btn-secondary {

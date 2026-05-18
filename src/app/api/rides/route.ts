@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       
       const ride = await Ride.create({
         kmStart: body.kmStart,
-        platform: body.platform || 'Both',
+        platform: body.platform || 'Aplicativos',
         date: new Date(),
         status: 'open'
       });
