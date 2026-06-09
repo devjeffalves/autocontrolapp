@@ -4,6 +4,7 @@ export interface IFueling {
   cost: number;
   litres: number;
   date: Date;
+  km?: number;
 }
 
 export interface IRide extends Document {
@@ -28,7 +29,8 @@ const RideSchema: Schema = new Schema({
   fuelings: [{
     cost: { type: Number, required: true },
     litres: { type: Number, required: true },
-    date: { type: Date, default: Date.now }
+    date: { type: Date, default: Date.now },
+    km: { type: Number }
   }],
   earnings: { type: Number, default: 0 },
   status: { type: String, enum: ['open', 'closed'], default: 'open' },

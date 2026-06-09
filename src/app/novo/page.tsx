@@ -13,7 +13,7 @@ export default function NovoRegistro() {
 
   // Form states for different actions
   const [startData, setStartData] = useState({ kmStart: '', platform: 'Aplicativos' });
-  const [fuelData, setFuelData] = useState({ fuelCost: '', fuelLitres: '' });
+  const [fuelData, setFuelData] = useState({ fuelCost: '', fuelLitres: '', fuelKm: '' });
   const [finishData, setFinishData] = useState({ kmEnd: '', rides: '', earnings: '', platform: 'Aplicativos' });
 
   // Voice recognition states
@@ -87,25 +87,26 @@ export default function NovoRegistro() {
     if (normalized.includes('abastec') || normalized.includes('gasolina') || normalized.includes('etanol') || normalized.includes('posto')) {
        const litrosVal = findNumberNear(['litro', 'l']);
        const valorVal = findNumberNear(['real', 'reais', 'r$', 'abastec', 'coloquei', 'botei']);
+       const kmVal = findNumberNear(['km', 'quilometragem', 'rodado']);
        
        if (valorVal && litrosVal) {
-         setFuelData({ fuelCost: valorVal, fuelLitres: litrosVal });
-         msg.push(`Abast: R$${valorVal} / ${litrosVal}L`);
+         setFuelData({ fuelCost: valorVal, fuelLitres: litrosVal, fuelKm: kmVal || '' });
+         msg.push(`Abast: R$${valorVal} / ${litrosVal}L${kmVal ? ` no KM ${kmVal}` : ''}`);
          understood = true;
        } else if (valorVal) {
-         setFuelData(prev => ({ ...prev, fuelCost: valorVal }));
-         msg.push(`Abast: R$${valorVal}`);
+         setFuelData(prev => ({ ...prev, fuelCost: valorVal, fuelKm: kmVal || '' }));
+         msg.push(`Abast: R$${valorVal}${kmVal ? ` no KM ${kmVal}` : ''}`);
          understood = true;
        } else {
          // Fallback se falou os números soltos
          const remMatches = tokens.join(' ').match(/\d+(?:[.,]\d+)?/g);
          if (remMatches && remMatches.length >= 2) {
-           setFuelData({ fuelCost: remMatches[0].replace(',', '.'), fuelLitres: remMatches[1].replace(',', '.') });
-           msg.push(`Abast: R$${remMatches[0]} / ${remMatches[1]}L`);
+           setFuelData({ fuelCost: remMatches[0].replace(',', '.'), fuelLitres: remMatches[1].replace(',', '.'), fuelKm: kmVal || '' });
+           msg.push(`Abast: R$${remMatches[0]} / ${remMatches[1]}L${kmVal ? ` no KM ${kmVal}` : ''}`);
            understood = true;
          } else if (remMatches && remMatches.length === 1) {
-           setFuelData(prev => ({ ...prev, fuelCost: remMatches[0].replace(',', '.') }));
-           msg.push(`Abast: R$${remMatches[0]}`);
+           setFuelData(prev => ({ ...prev, fuelCost: remMatches[0].replace(',', '.'), fuelKm: kmVal || '' }));
+           msg.push(`Abast: R$${remMatches[0]}${kmVal ? ` no KM ${kmVal}` : ''}`);
            understood = true;
          }
        }
@@ -232,7 +233,7 @@ export default function NovoRegistro() {
       const json = await res.json();
       if (json.success) {
         setNotification({ type: 'success', message: 'Abastecimento registrado!' });
-        setFuelData({ fuelCost: '', fuelLitres: '' });
+        setFuelData({ fuelCost: '', fuelLitres: '', fuelKm: '' });
         fetchActiveSession();
       } else {
         setNotification({ type: 'error', message: json.error });
@@ -413,6 +414,17 @@ export default function NovoRegistro() {
                     disabled={submitting}
                   />
                 </div>
+                <div className="input-group">
+                  <label>KM Atual</label>
+                  <input 
+                    type="number" 
+                    placeholder="KM no posto"
+                    value={fuelData.fuelKm}
+                    onChange={e => setFuelData({...fuelData, fuelKm: e.target.value})}
+                    required
+                    disabled={submitting}
+                  />
+                </div>
               </div>
               <button type="submit" className="btn-secondary" disabled={submitting}>
                 <Plus size={18} /> Adicionar Abastecimento
@@ -535,7 +547,7 @@ export default function NovoRegistro() {
         }
         .input-row {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
           gap: 12px;
           margin-bottom: 16px;
         }

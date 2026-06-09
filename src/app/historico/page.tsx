@@ -9,13 +9,19 @@ export default function Historico() {
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [vehicle, setVehicle] = useState<any>(null);
 
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/rides');
-      const data = await res.json();
-      if (data.success) setHistory(data.data);
+      const [rRes, vRes] = await Promise.all([
+        fetch('/api/rides'),
+        fetch('/api/vehicle')
+      ]);
+      const rData = await rRes.json();
+      const vData = await vRes.json();
+      if (rData.success) setHistory(rData.data);
+      if (vData.success) setVehicle(vData.data);
     } catch (error) {
       console.error('Erro ao buscar histórico:', error);
     } finally {
@@ -66,8 +72,33 @@ export default function Historico() {
     }
   };
 
+  // Calcular preço médio do combustível baseado em todo o histórico
+  let totalFuelCostForAvg = 0;
+  let totalLitresForAvg = 0;
+  history.forEach(r => {
+    r.fuelings?.forEach((f: any) => {
+      totalFuelCostForAvg += (f.cost || 0);
+      totalLitresForAvg += (f.litres || 0);
+    });
+  });
+  const avgFuelPrice = totalLitresForAvg > 0 ? (totalFuelCostForAvg / totalLitresForAvg) : 5.50;
+  const avgConsumption = vehicle?.avgConsumption || 10;
+
   const totalEarnings = history.reduce((acc, curr) => acc + (curr.earnings || 0), 0);
   const totalKm = history.reduce((acc, curr) => acc + ((curr.kmEnd || 0) - curr.kmStart), 0);
+
+  const totalProfit = history.reduce((acc, curr) => {
+    if (curr.platform === 'Passeio') return acc;
+    const kmTotal = (curr.kmEnd || 0) - curr.kmStart;
+    let rideFuelPrice = avgFuelPrice;
+    const rideFuelCost = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.cost || 0), 0) || 0;
+    const rideFuelLitres = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
+    if (rideFuelLitres > 0) {
+      rideFuelPrice = rideFuelCost / rideFuelLitres;
+    }
+    const fuelCostConsumed = (kmTotal / avgConsumption) * rideFuelPrice;
+    return acc + ((curr.earnings || 0) - fuelCostConsumed);
+  }, 0);
 
   return (
     <div className="historico-page">
@@ -80,7 +111,12 @@ export default function Historico() {
 
       <section className="summary-banner card">
         <div className="banner-item">
-          <p className="banner-label">Ganhos Acumulados</p>
+          <p className="banner-label">Lucro Líquido</p>
+          <p className="banner-value">R$ {totalProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+        </div>
+        <div className="banner-divider" />
+        <div className="banner-item">
+          <p className="banner-label">Ganhos Brutos</p>
           <p className="banner-value">R$ {totalEarnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
         </div>
         <div className="banner-divider" />
@@ -123,33 +159,48 @@ export default function Historico() {
                     </button>
                   </div>
                 </div>
-                <div className="history-main">
-                  <div className="history-info">
-                    <div className={`platform-tag ${item.platform?.toLowerCase() === 'passeio' ? 'passeio' : 'aplicativos'}`}>
-                      {item.platform}
-                    </div>
-                    <p className="history-meta">
-                      {item.platform === 'Passeio' 
-                        ? `${((item.kmEnd || 0) - item.kmStart).toFixed(1)}km percorridos`
-                        : `${item.rides} corridas • ${((item.kmEnd || 0) - item.kmStart).toFixed(1)}km`
-                      }
-                      {item.fuelings?.length > 0 && ` • ${item.fuelings.length} Abast.`}
-                    </p>
-                  </div>
-                  <div className="history-earnings">
-                    <div className="earnings-group">
-                      <p className="earning-value">
-                        {item.platform === 'Passeio' ? 'Lazer' : `R$ ${item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                      </p>
-                      {item.platform !== 'Passeio' && (
-                        <p className="profit-badge positive">
-                          Ganhos
+                {(() => {
+                  const itemKm = (item.kmEnd || 0) - item.kmStart;
+                  let rideFuelPrice = avgFuelPrice;
+                  const rideFuelCost = item.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.cost || 0), 0) || 0;
+                  const rideFuelLitres = item.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
+                  if (rideFuelLitres > 0) {
+                    rideFuelPrice = rideFuelCost / rideFuelLitres;
+                  }
+                  const fuelCostConsumed = (itemKm / avgConsumption) * rideFuelPrice;
+                  const lucroReal = (item.earnings || 0) - fuelCostConsumed;
+
+                  return (
+                    <div className="history-main">
+                      <div className="history-info">
+                        <div className={`platform-tag ${item.platform?.toLowerCase() === 'passeio' ? 'passeio' : 'aplicativos'}`}>
+                          {item.platform}
+                        </div>
+                        <p className="history-meta">
+                          {item.platform === 'Passeio' 
+                            ? `${itemKm.toFixed(1)}km percorridos`
+                            : `${item.rides} corridas • ${itemKm.toFixed(1)}km`
+                          }
+                          {item.fuelings?.length > 0 && ` • ${item.fuelings.length} Abast. (R$ ${rideFuelCost.toFixed(2)})`}
+                          {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / avgConsumption).toFixed(1)}L`}
                         </p>
-                      )}
+                      </div>
+                      <div className="history-earnings">
+                        <div className="earnings-group">
+                          <p className="earning-value">
+                            {item.platform === 'Passeio' ? 'Lazer' : `R$ ${item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          </p>
+                          {item.platform !== 'Passeio' && (
+                            <p className={`profit-badge ${lucroReal >= 0 ? 'positive' : 'negative'}`}>
+                              Lucro: R$ {lucroReal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          )}
+                        </div>
+                        <ChevronRight size={18} className="text-muted" />
+                      </div>
                     </div>
-                    <ChevronRight size={18} className="text-muted" />
-                  </div>
-                </div>
+                  );
+                })()}
               </motion.div>
             ))
           )}
@@ -223,9 +274,92 @@ export default function Historico() {
                     </select>
                   </div>
                 </div>
-                
 
-                <button type="submit" className="save-btn">
+                {/* Seção de Abastecimentos no Modal */}
+                <div className="modal-fuelings-section">
+                  <h4 className="fuelings-title">Abastecimentos do Turno</h4>
+                  
+                  <div className="modal-fuelings-list">
+                    {!editingItem.fuelings || editingItem.fuelings.length === 0 ? (
+                      <p className="no-fuelings">Nenhum abastecimento associado.</p>
+                    ) : (
+                      editingItem.fuelings.map((f: any, fIdx: number) => (
+                        <div key={fIdx} className="modal-fueling-item">
+                          <span>R$ {f.cost.toFixed(2)} • {f.litres}L {f.km ? `• ${f.km} KM` : ''}</span>
+                          <button 
+                            type="button" 
+                            className="remove-fueling-btn"
+                            onClick={() => {
+                              const updatedFuelings = [...editingItem.fuelings];
+                              updatedFuelings.splice(fIdx, 1);
+                              setEditingItem({ ...editingItem, fuelings: updatedFuelings });
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="add-fueling-quick">
+                    <h5>Adicionar Abastecimento</h5>
+                    <div className="quick-inputs">
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="R$ 0,00"
+                        id="quick-cost"
+                      />
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00 L"
+                        id="quick-litres"
+                      />
+                      <input 
+                        type="number" 
+                        placeholder="KM no posto"
+                        id="quick-km"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          const costEl = document.getElementById('quick-cost') as HTMLInputElement;
+                          const litresEl = document.getElementById('quick-litres') as HTMLInputElement;
+                          const kmEl = document.getElementById('quick-km') as HTMLInputElement;
+                          
+                          if (costEl && litresEl) {
+                            const cost = parseFloat(costEl.value);
+                            const litres = parseFloat(litresEl.value);
+                            const km = kmEl.value ? parseInt(kmEl.value) : undefined;
+                            
+                            if (cost > 0 && litres > 0) {
+                              const newF = {
+                                cost,
+                                litres,
+                                km,
+                                date: new Date()
+                              };
+                              const updatedFuelings = [...(editingItem.fuelings || []), newF];
+                              setEditingItem({ ...editingItem, fuelings: updatedFuelings });
+                              
+                              costEl.value = '';
+                              litresEl.value = '';
+                              kmEl.value = '';
+                            } else {
+                              alert('Preencha Valor e Litros.');
+                            }
+                          }
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" className="save-btn" style={{ marginTop: '10px' }}>
                   <Save size={18} />
                   Salvar Alterações
                 </button>
@@ -564,6 +698,101 @@ export default function Historico() {
           .modal-content {
             padding: 16px;
           }
+        }
+
+        .modal-fuelings-section {
+          border-top: 1px solid var(--glass-border);
+          padding-top: 16px;
+          margin-top: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .fuelings-title {
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+        .modal-fuelings-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-height: 120px;
+          overflow-y: auto;
+        }
+        .no-fuelings {
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          font-style: italic;
+        }
+        .modal-fueling-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #f8fafc;
+          padding: 8px 12px;
+          border-radius: 6px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          border: 1px solid #f1f5f9;
+        }
+        .remove-fueling-btn {
+          background: none;
+          border: none;
+          color: #ef4444;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2px;
+        }
+        .remove-fueling-btn:hover {
+          color: #991b1b;
+        }
+        .add-fueling-quick {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          background: #f8fafc;
+          padding: 12px;
+          border-radius: 8px;
+          border: 1px dashed var(--glass-border);
+        }
+        .add-fueling-quick h5 {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--text-muted);
+        }
+        .quick-inputs {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr auto;
+          gap: 8px;
+          align-items: center;
+        }
+        .quick-inputs input {
+          padding: 6px 8px !important;
+          font-size: 0.75rem !important;
+          font-weight: 600;
+          border-radius: 6px !important;
+        }
+        .quick-inputs button {
+          background: var(--primary);
+          color: white;
+          border: none;
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: 700;
+          font-size: 1rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+        .quick-inputs button:hover {
+          filter: brightness(1.1);
         }
       `}</style>
     </div>

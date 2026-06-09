@@ -265,6 +265,39 @@ export default function Dashboard() {
   
   const netProfit = totalEarnings - estimatedFuelCost;
   const profitPerKm = totalKm > 0 ? netProfit / totalKm : 0;
+
+  // Lógica de Projeção do Próximo Abastecimento
+  let lastFueling: any = null;
+  const allRides = rides;
+  for (const ride of allRides) {
+    if (ride.fuelings && ride.fuelings.length > 0) {
+      const sortedFuelings = [...ride.fuelings].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const found = sortedFuelings.find((f: any) => f.km && f.km > 0 && f.litres > 0);
+      if (found) {
+        lastFueling = found;
+        break;
+      }
+    }
+  }
+
+  let projection: { nextFuelingKm: number; kmRemaining: number; status: 'ok' | 'warning' | 'urgent' } | null = null;
+  if (lastFueling && vehicle) {
+    const nextFuelingKm = lastFueling.km + (lastFueling.litres * realAvgConsumptionNum);
+    const kmRemaining = nextFuelingKm - vehicle.currentKm;
+    
+    let status: 'ok' | 'warning' | 'urgent' = 'ok';
+    if (kmRemaining <= 0) {
+      status = 'urgent';
+    } else if (kmRemaining < 50) {
+      status = 'warning';
+    }
+    
+    projection = {
+      nextFuelingKm: Math.round(nextFuelingKm),
+      kmRemaining: Math.round(kmRemaining),
+      status
+    };
+  }
   
   const stats = [
     { 
@@ -390,6 +423,32 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {projection && (
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`dashboard-projection glass ${projection.status}`}
+        >
+          <div className="proj-header">
+            <div>
+              <h4 className="proj-title">Projeção de Próximo Abastecimento</h4>
+              <p className="proj-value">Projetado para {projection.nextFuelingKm.toLocaleString('pt-BR')} KM</p>
+            </div>
+            <div>
+              {projection.kmRemaining > 0 ? (
+                <p className="proj-remaining">
+                  Faltam aprox. <strong>{projection.kmRemaining} km</strong>
+                </p>
+              ) : (
+                <p className="proj-remaining danger">
+                  Abasteça! Passou <strong>{Math.abs(projection.kmRemaining)} km</strong>
+                </p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       <section className="recent-activity">
         <div className="section-header">
           <h3 className="section-title">Atividades Recentes</h3>
@@ -405,39 +464,58 @@ export default function Dashboard() {
             ) : filteredRides.length === 0 ? (
               <p className="empty-state">Nenhuma atividade registrada no período.</p>
             ) : (
-              filteredRides.slice(0, 5).map((item, i) => (
-                <motion.div 
-                  key={item._id || i} 
-                  className={`activity-item glass ${isDeleting === item._id ? 'deleting' : ''}`}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <div className={`platform-badge ${item.platform?.toLowerCase() === 'passeio' ? 'passeio' : 'aplicativos'}`}>
-                    {item.platform}
-                  </div>
-                  <div className="activity-info">
-                    <p className="activity-value">
-                      {item.platform === 'Passeio' 
-                        ? 'Lazer / Passeio' 
-                        : `R$ ${item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                      }
-                    </p>
-                    <p className="activity-meta">
-                      {item.kmTotal?.toFixed(1) || 0}km • {new Date(item.date).toLocaleDateString('pt-BR')}
-                    </p>
-                  </div>
-                  <div className="activity-actions">
-                    <button className="action-btn edit" onClick={() => setEditingItem(item)}>
-                      <Pencil size={14} />
-                    </button>
-                    <button className="action-btn delete" onClick={() => handleDelete(item._id)}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </motion.div>
-              ))
+              filteredRides.slice(0, 5).map((item, i) => {
+                const itemKm = item.kmTotal || 0;
+                let rideFuelPrice = avgFuelPrice;
+                const rideFuelCost = item.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.cost || 0), 0) || 0;
+                const rideFuelLitres = item.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
+                if (rideFuelLitres > 0) {
+                  rideFuelPrice = rideFuelCost / rideFuelLitres;
+                }
+                const fuelCostConsumed = (itemKm / realAvgConsumptionNum) * rideFuelPrice;
+                const lucroReal = (item.earnings || 0) - fuelCostConsumed;
+
+                return (
+                  <motion.div 
+                    key={item._id || i} 
+                    className={`activity-item glass ${isDeleting === item._id ? 'deleting' : ''}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <div className={`platform-badge ${item.platform?.toLowerCase() === 'passeio' ? 'passeio' : 'aplicativos'}`}>
+                      {item.platform}
+                    </div>
+                    <div className="activity-info">
+                      <p className="activity-value">
+                        {item.platform === 'Passeio' 
+                          ? 'Lazer / Passeio' 
+                          : `R$ ${item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                        }
+                        {item.platform !== 'Passeio' && (
+                          <span className={`lucro-badge ${lucroReal >= 0 ? 'positive' : 'negative'}`}>
+                            Lucro: R$ {lucroReal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </p>
+                      <p className="activity-meta">
+                        {itemKm.toFixed(1)}km • {new Date(item.date).toLocaleDateString('pt-BR')}
+                        {item.fuelings?.length > 0 && ` • ${item.fuelings.length} Abast. (R$ ${rideFuelCost.toFixed(2)})`}
+                        {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / realAvgConsumptionNum).toFixed(1)}L`}
+                      </p>
+                    </div>
+                    <div className="activity-actions">
+                      <button className="action-btn edit" onClick={() => setEditingItem(item)}>
+                        <Pencil size={14} />
+                      </button>
+                      <button className="action-btn delete" onClick={() => handleDelete(item._id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })
             )}
           </AnimatePresence>
     
@@ -512,9 +590,92 @@ export default function Dashboard() {
                     </select>
                   </div>
                 </div>
-                
 
-                <button type="submit" className="save-btn">
+                {/* Seção de Abastecimentos no Modal */}
+                <div className="modal-fuelings-section">
+                  <h4 className="fuelings-title">Abastecimentos do Turno</h4>
+                  
+                  <div className="modal-fuelings-list">
+                    {!editingItem.fuelings || editingItem.fuelings.length === 0 ? (
+                      <p className="no-fuelings">Nenhum abastecimento associado.</p>
+                    ) : (
+                      editingItem.fuelings.map((f: any, fIdx: number) => (
+                        <div key={fIdx} className="modal-fueling-item">
+                          <span>R$ {f.cost.toFixed(2)} • {f.litres}L {f.km ? `• ${f.km} KM` : ''}</span>
+                          <button 
+                            type="button" 
+                            className="remove-fueling-btn"
+                            onClick={() => {
+                              const updatedFuelings = [...editingItem.fuelings];
+                              updatedFuelings.splice(fIdx, 1);
+                              setEditingItem({ ...editingItem, fuelings: updatedFuelings });
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="add-fueling-quick">
+                    <h5>Adicionar Abastecimento</h5>
+                    <div className="quick-inputs">
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="R$ 0,00"
+                        id="quick-cost-dash"
+                      />
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00 L"
+                        id="quick-litres-dash"
+                      />
+                      <input 
+                        type="number" 
+                        placeholder="KM no posto"
+                        id="quick-km-dash"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          const costEl = document.getElementById('quick-cost-dash') as HTMLInputElement;
+                          const litresEl = document.getElementById('quick-litres-dash') as HTMLInputElement;
+                          const kmEl = document.getElementById('quick-km-dash') as HTMLInputElement;
+                          
+                          if (costEl && litresEl) {
+                            const cost = parseFloat(costEl.value);
+                            const litres = parseFloat(litresEl.value);
+                            const km = kmEl.value ? parseInt(kmEl.value) : undefined;
+                            
+                            if (cost > 0 && litres > 0) {
+                              const newF = {
+                                cost,
+                                litres,
+                                km,
+                                date: new Date()
+                              };
+                              const updatedFuelings = [...(editingItem.fuelings || []), newF];
+                              setEditingItem({ ...editingItem, fuelings: updatedFuelings });
+                              
+                              costEl.value = '';
+                              litresEl.value = '';
+                              kmEl.value = '';
+                            } else {
+                              alert('Preencha Valor e Litros.');
+                            }
+                          }
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" className="save-btn" style={{ marginTop: '10px' }}>
                   <Save size={18} />
                   Salvar Alterações
                 </button>
@@ -1214,6 +1375,167 @@ export default function Dashboard() {
           .form-group.full {
             grid-column: span 1;
           }
+        }
+
+        /* Projeção no Dashboard */
+        .dashboard-projection {
+          margin-bottom: 24px;
+          padding: 16px 20px;
+          border-radius: 16px;
+          border-left: 4px solid var(--primary);
+        }
+        .dashboard-projection.warning {
+          border-left-color: var(--warning);
+        }
+        .dashboard-projection.urgent {
+          border-left-color: var(--danger);
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(255, 255, 255, 0.5) 100%);
+        }
+        .proj-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .proj-title {
+          font-size: 0.7rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          margin-bottom: 4px;
+        }
+        .proj-value {
+          font-size: 1.15rem;
+          font-weight: 800;
+          color: #0f172a;
+        }
+        .proj-remaining {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--text-muted);
+        }
+        .proj-remaining strong {
+          color: var(--primary);
+          font-size: 0.95rem;
+        }
+        .proj-remaining.danger {
+          color: #ef4444;
+          font-weight: 700;
+        }
+        .proj-remaining.danger strong {
+          color: #ef4444;
+        }
+
+        /* Lucro Badge */
+        .lucro-badge {
+          font-size: 0.75rem;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-weight: 800;
+          margin-left: 10px;
+        }
+        .lucro-badge.positive {
+          background: #dcfce7;
+          color: #166534;
+        }
+        .lucro-badge.negative {
+          background: #fee2e2;
+          color: #991b1b;
+        }
+
+        /* Modal Abastecimentos */
+        .modal-fuelings-section {
+          border-top: 1px solid var(--glass-border);
+          padding-top: 16px;
+          margin-top: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .fuelings-title {
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+        .modal-fuelings-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-height: 120px;
+          overflow-y: auto;
+        }
+        .no-fuelings {
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          font-style: italic;
+        }
+        .modal-fueling-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #f8fafc;
+          padding: 8px 12px;
+          border-radius: 6px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          border: 1px solid #f1f5f9;
+        }
+        .remove-fueling-btn {
+          background: none;
+          border: none;
+          color: #ef4444;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2px;
+        }
+        .remove-fueling-btn:hover {
+          color: #991b1b;
+        }
+        .add-fueling-quick {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          background: #f8fafc;
+          padding: 12px;
+          border-radius: 8px;
+          border: 1px dashed var(--glass-border);
+        }
+        .add-fueling-quick h5 {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--text-muted);
+        }
+        .quick-inputs {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr auto;
+          gap: 8px;
+          align-items: center;
+        }
+        .quick-inputs input {
+          padding: 6px 8px !important;
+          font-size: 0.75rem !important;
+          font-weight: 600;
+          border-radius: 6px !important;
+        }
+        .quick-inputs button {
+          background: var(--primary);
+          color: white;
+          border: none;
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: 700;
+          font-size: 1rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+        .quick-inputs button:hover {
+          filter: brightness(1.1);
         }
       `}</style>
     </div>

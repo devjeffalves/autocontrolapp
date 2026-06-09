@@ -19,13 +19,15 @@ export default function Veiculo() {
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [newReminder, setNewReminder] = useState({ title: '', dueInfo: '', status: 'ok' });
   const [isUploading, setIsUploading] = useState(false);
+  const [realAvg, setRealAvg] = useState<number | null>(null);
+  const [projection, setProjection] = useState<{ nextFuelingKm: number; kmRemaining: number; status: 'ok' | 'warning' | 'urgent' } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [vRes, rRes] = await Promise.all([
           fetch('/api/vehicle'),
-          fetch('/api/rides?status=closed')
+          fetch('/api/rides')
         ]);
         const vData = await vRes.json();
         const rData = await rRes.json();
@@ -33,11 +35,12 @@ export default function Veiculo() {
         if (vData.data) setVehicle(vData.data);
         
         if (rData.success) {
-          const closedRides = rData.data;
+          const allRides = rData.data;
           
           let totalLitres = 0;
           let totalKm = 0;
           
+          const closedRides = allRides.filter((r: any) => r.status === 'closed');
           closedRides.forEach((r: any) => {
             const rideLitres = r.fuelings?.reduce((acc: number, curr: any) => acc + (curr.litres || 0), 0) || 0;
             if (rideLitres > 0) {
@@ -46,8 +49,44 @@ export default function Veiculo() {
             }
           });
           
+          let computedAvg = vData.data?.avgConsumption || 10;
           if (totalLitres > 0) {
-            setRealAvg((totalKm / totalLitres));
+            const calculatedAvg = totalKm / totalLitres;
+            setRealAvg(calculatedAvg);
+            computedAvg = calculatedAvg;
+          }
+
+          // Achar o abastecimento mais recente com km gravado
+          let lastFueling: any = null;
+          for (const ride of allRides) {
+            if (ride.fuelings && ride.fuelings.length > 0) {
+              const sortedFuelings = [...ride.fuelings].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              const found = sortedFuelings.find((f: any) => f.km && f.km > 0 && f.litres > 0);
+              if (found) {
+                lastFueling = found;
+                break;
+              }
+            }
+          }
+
+          if (lastFueling && vData.data) {
+            const nextFuelingKm = lastFueling.km + (lastFueling.litres * computedAvg);
+            const kmRemaining = nextFuelingKm - vData.data.currentKm;
+            
+            let status: 'ok' | 'warning' | 'urgent' = 'ok';
+            if (kmRemaining <= 0) {
+              status = 'urgent';
+            } else if (kmRemaining < 50) {
+              status = 'warning';
+            }
+            
+            setProjection({
+              nextFuelingKm: Math.round(nextFuelingKm),
+              kmRemaining: Math.round(kmRemaining),
+              status
+            });
+          } else {
+            setProjection(null);
           }
         }
       } catch (error) {
@@ -57,7 +96,6 @@ export default function Veiculo() {
     fetchData();
   }, []);
 
-  const [realAvg, setRealAvg] = useState<number | null>(null);
   const displayAvg = realAvg || vehicle.avgConsumption;
 
   // Auto-save logic
@@ -249,6 +287,38 @@ export default function Veiculo() {
           </div>
         </div>
       </section>
+
+      {projection && (
+        <section className={`projection-section card glass ${projection.status}`}>
+          <div className="section-header">
+            <h3 className="section-title">Projeção de Abastecimento</h3>
+            <Fuel size={16} className="text-muted" />
+          </div>
+          <div className="projection-body">
+            <div className="projection-main">
+              <p className="projection-label">Próximo abastecimento projetado em</p>
+              <h2 className="projection-km">{projection.nextFuelingKm.toLocaleString('pt-BR')} KM</h2>
+            </div>
+            
+            <div className="projection-status-container">
+              {projection.kmRemaining > 0 ? (
+                <p className="remaining-km">
+                  Faltam aproximadamente <strong>{projection.kmRemaining} km</strong>
+                </p>
+              ) : (
+                <p className="remaining-km danger">
+                  <strong>Atenção:</strong> Abastecimento necessário! Passou do projetado em <strong>{Math.abs(projection.kmRemaining)} km</strong>
+                </p>
+              )}
+              <div className={`status-pill ${projection.status}`}>
+                {projection.status === 'ok' && 'Autonomia Segura'}
+                {projection.status === 'warning' && 'Combustível na Reserva'}
+                {projection.status === 'urgent' && 'Reabastecer Imediatamente'}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="maintenance-list">
         <div className="section-header">
@@ -709,6 +779,69 @@ export default function Veiculo() {
           .consumption-number {
             font-size: 2.5rem;
           }
+        }
+
+        .projection-section {
+          padding: 20px;
+          border-left: 4px solid var(--primary);
+        }
+        .projection-section.warning {
+          border-left-color: var(--warning);
+        }
+        .projection-section.urgent {
+          border-left-color: var(--danger);
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(255, 255, 255, 0.5) 100%);
+        }
+        .projection-body {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          margin-top: 10px;
+        }
+        .projection-label {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          font-weight: 700;
+        }
+        .projection-km {
+          font-size: 1.75rem;
+          font-weight: 800;
+          color: #0f172a;
+          margin-top: 4px;
+        }
+        .projection-status-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-top: 1px solid var(--glass-border);
+          padding-top: 12px;
+        }
+        .remaining-km {
+          font-size: 0.85rem;
+          color: #1e293b;
+        }
+        .remaining-km.danger {
+          color: #ef4444;
+        }
+        .status-pill {
+          font-size: 0.65rem;
+          font-weight: 800;
+          padding: 4px 8px;
+          border-radius: 6px;
+          text-transform: uppercase;
+        }
+        .status-pill.ok {
+          background: #dcfce7;
+          color: #166534;
+        }
+        .status-pill.warning {
+          background: #fef9c3;
+          color: #854d0e;
+        }
+        .status-pill.urgent {
+          background: #fee2e2;
+          color: #991b1b;
         }
       `}</style>
     </div>

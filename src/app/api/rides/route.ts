@@ -49,12 +49,23 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.action === 'add_fueling') {
+      const fuelKmNum = body.fuelKm ? Number(body.fuelKm) : undefined;
       activeSession.fuelings.push({
-        cost: body.fuelCost,
-        litres: body.fuelLitres,
+        cost: Number(body.fuelCost),
+        litres: Number(body.fuelLitres),
+        km: fuelKmNum,
         date: new Date()
       });
       await activeSession.save();
+
+      // Atualizar o KM do veículo se o KM informado for maior
+      if (fuelKmNum) {
+        await Vehicle.findOneAndUpdate(
+          { currentKm: { $lt: fuelKmNum } },
+          { currentKm: fuelKmNum, lastUpdated: new Date() }
+        );
+      }
+
       return NextResponse.json({ success: true, data: activeSession });
     }
 

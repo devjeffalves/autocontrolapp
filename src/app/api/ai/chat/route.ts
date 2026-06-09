@@ -25,13 +25,37 @@ export async function POST(request: NextRequest) {
       Vehicle.findOne({})
     ]);
 
-    const statsContext = rides.map(r => ({
-      data: r.date.toLocaleDateString('pt-BR'),
-      ganhos: r.earnings,
-      km: r.kmTotal,
-      lucro: (r.earnings || 0) - (r.fuelings?.reduce((acc: number, f: any) => acc + (f.cost || 0), 0) || 0),
-      plataforma: r.platform
-    }));
+    const vehicleAvgConsumption = vehicle?.avgConsumption || 10;
+    let totalCost = 0;
+    let totalLitres = 0;
+    rides.forEach(r => {
+      r.fuelings?.forEach((f: any) => {
+        totalCost += (f.cost || 0);
+        totalLitres += (f.litres || 0);
+      });
+    });
+    const avgFuelPrice = totalLitres > 0 ? (totalCost / totalLitres) : 5.50;
+
+    const statsContext = rides.map(r => {
+      const kmTotal = r.kmTotal || 0;
+      let rideFuelPrice = avgFuelPrice;
+      const rideFuelCost = r.fuelings?.reduce((acc: number, f: any) => acc + (f.cost || 0), 0) || 0;
+      const rideFuelLitres = r.fuelings?.reduce((acc: number, f: any) => acc + (f.litres || 0), 0) || 0;
+      if (rideFuelLitres > 0) {
+        rideFuelPrice = rideFuelCost / rideFuelLitres;
+      }
+      
+      const fuelCostConsumed = (kmTotal / vehicleAvgConsumption) * rideFuelPrice;
+      const lucro = (r.earnings || 0) - fuelCostConsumed;
+
+      return {
+        data: r.date.toLocaleDateString('pt-BR'),
+        ganhos: r.earnings,
+        km: kmTotal,
+        lucro: Number(lucro.toFixed(2)),
+        plataforma: r.platform
+      };
+    });
 
     const systemPrompt = `
       Você é a "Assistente de Bordo" da Auto Control, uma parceira amigável e encorajadora para motoristas de aplicativo.
