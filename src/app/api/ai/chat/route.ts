@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
       DIRETRIZES:
       1. Baseie seus conselhos nos dados reais fornecidos.
       2. Foque em como aumentar o lucro por KM de forma leve.
-      3. Sempre responda em Português do Brasil.
+      3. Sempre formate valores monetários no padrão de moeda brasileiro (R$ XX,XX) usando a vírgula como separador decimal.
+      4. Sempre responda em Português do Brasil.
     `;
 
     const chatCompletion = await groq.chat.completions.create({
