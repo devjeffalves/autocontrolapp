@@ -100,14 +100,13 @@ export default function Historico() {
 
   const avgFuelPrice = totalLitresForAvg > 0 ? (totalFuelCostForAvg / totalLitresForAvg) : 5.50;
 
-  // Consumo acumulado real de todo o histórico
-  const calculatedAvgConsumption = totalLitresForAvg > 0 ? (totalKmForRealAvg / totalLitresForAvg) : 0;
-  const isConsumptionInconsistent = totalLitresForAvg > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
+  // Consumo acumulado real GLOBAL de todo o histórico
+  const calculatedAvgGlobal = totalLitresForAvg > 0 ? (totalKmForRealAvg / totalLitresForAvg) : 0;
+  const isGlobalInconsistent = totalLitresForAvg > 0 && (calculatedAvgGlobal < 6 || calculatedAvgGlobal > 22);
 
-  // Média efetiva para os cálculos de combustível no histórico: 
-  // se estiver consistente, usa o calculado; senão, usa a cadastrada do veículo (padrão Kwid: 14.5)
-  const effectiveConsumption = (totalLitresForAvg > 0 && !isConsumptionInconsistent)
-    ? calculatedAvgConsumption
+  // Média global efetiva para estimar combustível de viagens individuais
+  const globalConsumptionNum = (totalLitresForAvg > 0 && !isGlobalInconsistent)
+    ? calculatedAvgGlobal
     : (vehicle?.avgConsumption || 14.5);
 
   const totalEarnings = history.reduce((acc, curr) => acc + (curr.earnings || 0), 0);
@@ -122,7 +121,7 @@ export default function Historico() {
     if (rideFuelLitres > 0) {
       rideFuelPrice = rideFuelCost / rideFuelLitres;
     }
-    const fuelCostConsumed = (kmTotal / effectiveConsumption) * rideFuelPrice;
+    const fuelCostConsumed = (kmTotal / globalConsumptionNum) * rideFuelPrice;
     return acc + ((curr.earnings || 0) - fuelCostConsumed);
   }, 0);
 
@@ -193,7 +192,7 @@ export default function Historico() {
                   if (rideFuelLitres > 0) {
                     rideFuelPrice = rideFuelCost / rideFuelLitres;
                   }
-                  const fuelCostConsumed = (itemKm / effectiveConsumption) * rideFuelPrice;
+                  const fuelCostConsumed = (itemKm / globalConsumptionNum) * rideFuelPrice;
                   const lucroReal = (item.earnings || 0) - fuelCostConsumed;
 
                   return (
@@ -218,7 +217,7 @@ export default function Historico() {
                             return null;
                           })()}
                           {item.fuelings?.length > 0 && ` • ${item.fuelings.length} Abast. (R$ ${rideFuelCost.toFixed(2)})`}
-                          {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / effectiveConsumption).toFixed(1)}L`}
+                          {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / globalConsumptionNum).toFixed(1)}L`}
                         </p>
                       </div>
                       <div className="history-earnings">
@@ -642,6 +641,7 @@ export default function Historico() {
           justify-content: center;
           z-index: 1000;
           padding: 20px;
+          overflow-y: auto;
         }
 
         .modal-content {
@@ -649,6 +649,12 @@ export default function Historico() {
           max-width: 450px;
           padding: 24px;
           background: white;
+          border-radius: 16px;
+          margin: auto;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
 
         .modal-header {
@@ -656,6 +662,7 @@ export default function Historico() {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 20px;
+          flex-shrink: 0;
         }
 
         .modal-title {
@@ -674,6 +681,8 @@ export default function Historico() {
           display: flex;
           flex-direction: column;
           gap: 20px;
+          overflow-y: auto;
+          padding-right: 4px;
         }
 
         .form-grid {

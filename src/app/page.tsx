@@ -265,6 +265,22 @@ export default function Dashboard() {
   const displayAvgConsumptionNum = totalLitres > 0 ? calculatedAvgConsumption : (vehicle?.avgConsumption || 14.5);
   const realAvgConsumption = displayAvgConsumptionNum.toFixed(1);
 
+  // Consumo acumulado real GLOBAL (de todo o histórico de viagens)
+  let totalLitresGlobal = 0;
+  let totalKmGlobal = 0;
+  rides.filter(r => r.status === 'closed').forEach(r => {
+    const rideLitres = r.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
+    totalLitresGlobal += rideLitres;
+    totalKmGlobal += (r.kmTotal || 0);
+  });
+  
+  const calculatedAvgGlobal = totalLitresGlobal > 0 ? (totalKmGlobal / totalLitresGlobal) : 0;
+  const isGlobalInconsistent = totalLitresGlobal > 0 && (calculatedAvgGlobal < 6 || calculatedAvgGlobal > 22);
+  
+  const globalConsumptionNum = (totalLitresGlobal > 0 && !isGlobalInconsistent)
+    ? calculatedAvgGlobal
+    : (vehicle?.avgConsumption || 14.5);
+
   // Custo estimado de combustível para a distância percorrida no período
   const estimatedFuelCost = totalKm > 0 ? (totalKm / realAvgConsumptionNum) * avgFuelPrice : 0;
   
@@ -536,7 +552,7 @@ export default function Dashboard() {
                 if (rideFuelLitres > 0) {
                   rideFuelPrice = rideFuelCost / rideFuelLitres;
                 }
-                const fuelCostConsumed = (itemKm / realAvgConsumptionNum) * rideFuelPrice;
+                const fuelCostConsumed = (itemKm / globalConsumptionNum) * rideFuelPrice;
                 const lucroReal = (item.earnings || 0) - fuelCostConsumed;
 
                 return (
@@ -566,7 +582,7 @@ export default function Dashboard() {
                       <p className="activity-meta">
                         {itemKm.toFixed(1)}km • {new Date(item.date).toLocaleDateString('pt-BR')}
                         {item.fuelings?.length > 0 && ` • ${item.fuelings.length} Abast. (R$ ${rideFuelCost.toFixed(2)})`}
-                        {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / realAvgConsumptionNum).toFixed(1)}L`}
+                        {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / globalConsumptionNum).toFixed(1)}L`}
                       </p>
                     </div>
                     <div className="activity-actions">
@@ -1131,6 +1147,7 @@ export default function Dashboard() {
           justify-content: center;
           z-index: 1000;
           padding: 20px;
+          overflow-y: auto;
         }
 
         .modal-content {
@@ -1138,6 +1155,12 @@ export default function Dashboard() {
           max-width: 450px;
           padding: 24px;
           background: white;
+          border-radius: 16px;
+          margin: auto;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
 
         .modal-header {
@@ -1145,6 +1168,7 @@ export default function Dashboard() {
           justify-content: space-between;
           align-items: center;
           margin-bottom: 20px;
+          flex-shrink: 0;
         }
 
         .modal-title {
@@ -1163,6 +1187,8 @@ export default function Dashboard() {
           display: flex;
           flex-direction: column;
           gap: 20px;
+          overflow-y: auto;
+          padding-right: 4px;
         }
 
         .form-grid {
