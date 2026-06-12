@@ -16,6 +16,8 @@ export interface IRide extends Document {
   fuelings: IFueling[];
   earnings: number;
   status: 'open' | 'closed';
+  startTime?: Date;
+  endTime?: Date;
   date: Date;
   createdAt: Date;
 }
@@ -34,6 +36,8 @@ const RideSchema: Schema = new Schema({
   }],
   earnings: { type: Number, default: 0 },
   status: { type: String, enum: ['open', 'closed'], default: 'open' },
+  startTime: { type: Date },
+  endTime: { type: Date },
   date: { type: Date, required: true, default: Date.now },
   createdAt: { type: Date, default: Date.now },
 });

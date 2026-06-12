@@ -11,10 +11,15 @@ export default function NovoRegistro() {
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
+  const getLocalDateTimeString = () => {
+    const tzoffset = (new Date()).getTimezoneOffset() * 60000;
+    return (new Date(Date.now() - tzoffset)).toISOString().slice(0, 16);
+  };
+
   // Form states for different actions
-  const [startData, setStartData] = useState({ kmStart: '', platform: 'Aplicativos' });
+  const [startData, setStartData] = useState(() => ({ kmStart: '', platform: 'Aplicativos', startTime: getLocalDateTimeString() }));
   const [fuelData, setFuelData] = useState({ fuelCost: '', fuelLitres: '', fuelKm: '' });
-  const [finishData, setFinishData] = useState({ kmEnd: '', rides: '', earnings: '', platform: 'Aplicativos' });
+  const [finishData, setFinishData] = useState(() => ({ kmEnd: '', rides: '', earnings: '', platform: 'Aplicativos', endTime: getLocalDateTimeString() }));
 
   // Voice recognition states
   const [isListening, setIsListening] = useState(false);
@@ -187,7 +192,7 @@ export default function NovoRegistro() {
       const json = await res.json();
       if (json.success && json.data.length > 0) {
         setActiveSession(json.data[0]);
-        setFinishData(prev => ({ ...prev, platform: json.data[0].platform }));
+        setFinishData(prev => ({ ...prev, platform: json.data[0].platform, endTime: getLocalDateTimeString() }));
       } else {
         setActiveSession(null);
       }
@@ -341,6 +346,17 @@ export default function NovoRegistro() {
             </div>
 
             <div className="input-group">
+              <label>Data e Hora de Início</label>
+              <input 
+                type="datetime-local" 
+                value={startData.startTime}
+                onChange={e => setStartData({...startData, startTime: e.target.value})}
+                required
+                disabled={submitting}
+              />
+            </div>
+
+            <div className="input-group">
               <label>Tipo de Atividade</label>
               <div className="platform-toggle">
                 <button 
@@ -365,11 +381,48 @@ export default function NovoRegistro() {
           <div className="active-session-flow">
             {/* Status do Turno */}
             <div className="card status-summary">
-              <div className="status-header">
-                <div className="status-badge open">Turno em Aberto</div>
-                <span className="date">{new Date(activeSession.date).toLocaleDateString('pt-BR')}</span>
+              <div className="status-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div className="status-badge open">Turno em Aberto</div>
+                  <span className="date">{new Date(activeSession.startTime || activeSession.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <button 
+                  onClick={async () => {
+                    if (!confirm('Deseja realmente cancelar e excluir este turno iniciado? Todos os dados não salvos serão perdidos.')) return;
+                    setSubmitting(true);
+                    try {
+                      const res = await fetch(`/api/rides/${activeSession._id}`, { method: 'DELETE' });
+                      const json = await res.json();
+                      if (json.success) {
+                        setNotification({ type: 'success', message: 'Turno excluído com sucesso!' });
+                        setActiveSession(null);
+                        fetchActiveSession();
+                      } else {
+                        setNotification({ type: 'error', message: json.error });
+                      }
+                    } catch (err) {
+                      setNotification({ type: 'error', message: 'Erro ao cancelar o turno.' });
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  className="btn-cancel"
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Excluir Turno
+                </button>
               </div>
-              <div className="mini-stats">
+              <div className="mini-stats" style={{ marginTop: '12px' }}>
                 <div className="mini-stat">
                   <span className="label">KM Inicial</span>
                   <span className="value">{activeSession.kmStart}</span>
@@ -378,6 +431,14 @@ export default function NovoRegistro() {
                   <span className="label">Abastecimentos</span>
                   <span className="value">{activeSession.fuelings.length}</span>
                 </div>
+                {(activeSession.startTime || activeSession.date) && (
+                  <div className="mini-stat">
+                    <span className="label">Início</span>
+                    <span className="value" style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)' }}>
+                      {new Date(activeSession.startTime || activeSession.date).toLocaleDateString('pt-BR')} às {new Date(activeSession.startTime || activeSession.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -485,19 +546,47 @@ export default function NovoRegistro() {
                 </div>
               )}
 
-              {finishData.kmEnd && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="shift-preview glass"
-                >
-                  <div className="preview-item">
+              <div className="input-group" style={{ marginTop: '10px' }}>
+                <label>Data e Hora de Fim</label>
+                <input 
+                  type="datetime-local" 
+                  value={finishData.endTime}
+                  onChange={e => setFinishData({...finishData, endTime: e.target.value})}
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="shift-preview glass"
+                style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}
+              >
+                {finishData.kmEnd && (
+                  <div className="preview-item" style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>KM Total:</span>
                     <strong>{Number(finishData.kmEnd) - activeSession.kmStart} km</strong>
                   </div>
-
-                </motion.div>
-              )}
+                )}
+                {(() => {
+                  const start = new Date(activeSession.startTime || activeSession.date);
+                  const end = new Date(finishData.endTime);
+                  const diffMs = end.getTime() - start.getTime();
+                  const diffMin = Math.round(diffMs / 60000);
+                  if (diffMin > 0) {
+                    const hours = Math.floor(diffMin / 60);
+                    const mins = diffMin % 60;
+                    return (
+                      <div className="preview-item" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Duração do Turno:</span>
+                        <strong>{hours > 0 ? `${hours}h ${mins}m` : `${mins}m`}</strong>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </motion.div>
 
               <button type="submit" className="btn-primary" style={{ marginTop: '10px' }} disabled={submitting}>
                 {submitting ? <Loader2 className="animate-spin" /> : <Save size={18} />}

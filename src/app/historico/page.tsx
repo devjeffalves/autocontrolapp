@@ -33,6 +33,15 @@ export default function Historico() {
     fetchHistory();
   }, []);
 
+  const formatForDateTimeInput = (dateVal: any) => {
+    if (!dateVal) return '';
+    const date = new Date(dateVal);
+    if (isNaN(date.getTime())) return '';
+    const tzoffset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - tzoffset).toISOString().slice(0, 16);
+  };
+
+
   const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este registro?')) return;
     
@@ -198,6 +207,16 @@ export default function Historico() {
                             ? `${itemKm.toFixed(1)}km percorridos`
                             : `${item.rides} corridas • ${itemKm.toFixed(1)}km`
                           }
+                          {item.startTime && item.endTime && (() => {
+                            const diffMs = new Date(item.endTime).getTime() - new Date(item.startTime).getTime();
+                            const diffMin = Math.round(diffMs / 60000);
+                            if (diffMin > 0) {
+                              const hours = Math.floor(diffMin / 60);
+                              const mins = diffMin % 60;
+                              return ` • ⏱️ ${hours > 0 ? `${hours}h ${mins}m` : `${mins}m`}`;
+                            }
+                            return null;
+                          })()}
                           {item.fuelings?.length > 0 && ` • ${item.fuelings.length} Abast. (R$ ${rideFuelCost.toFixed(2)})`}
                           {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / effectiveConsumption).toFixed(1)}L`}
                         </p>
@@ -278,6 +297,22 @@ export default function Historico() {
                       value={editingItem.kmEnd || ''} 
                       onChange={e => setEditingItem({...editingItem, kmEnd: parseInt(e.target.value)})}
                       required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Início do Turno</label>
+                    <input 
+                      type="datetime-local" 
+                      value={formatForDateTimeInput(editingItem.startTime)} 
+                      onChange={e => setEditingItem({...editingItem, startTime: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Fim do Turno</label>
+                    <input 
+                      type="datetime-local" 
+                      value={formatForDateTimeInput(editingItem.endTime)} 
+                      onChange={e => setEditingItem({...editingItem, endTime: e.target.value})}
                     />
                   </div>
                   <div className="form-group full">

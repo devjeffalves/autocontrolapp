@@ -33,10 +33,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'Já existe uma sessão aberta' }, { status: 400 });
       }
       
+      const startTimeVal = body.startTime ? new Date(body.startTime) : new Date();
       const ride = await Ride.create({
         kmStart: body.kmStart,
         platform: body.platform || 'Aplicativos',
-        date: new Date(),
+        date: startTimeVal,
+        startTime: startTimeVal,
         status: 'open'
       });
       return NextResponse.json({ success: true, data: ride }, { status: 201 });
@@ -72,6 +74,7 @@ export async function POST(request: NextRequest) {
     if (body.action === 'finish') {
       const kmEnd = body.kmEnd;
       const kmTotal = kmEnd - activeSession.kmStart;
+      const endTimeVal = body.endTime ? new Date(body.endTime) : new Date();
       
       activeSession.kmEnd = kmEnd;
       activeSession.kmTotal = kmTotal;
@@ -79,9 +82,15 @@ export async function POST(request: NextRequest) {
       activeSession.earnings = body.earnings || 0;
       activeSession.status = 'closed';
       activeSession.platform = body.platform || activeSession.platform;
+      activeSession.endTime = endTimeVal;
+      
+      // se startTime não foi preenchido anteriormente por alguma razão
+      if (!activeSession.startTime) {
+        activeSession.startTime = activeSession.date || new Date();
+      }
       
       await activeSession.save();
-
+ 
       // Atualizar o KM atual do veículo
       await Vehicle.findOneAndUpdate({}, { currentKm: kmEnd, lastUpdated: new Date() });
       

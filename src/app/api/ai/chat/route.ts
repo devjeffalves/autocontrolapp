@@ -56,12 +56,24 @@ export async function POST(request: NextRequest) {
       const fuelCostConsumed = (kmTotal / vehicleAvgConsumption) * rideFuelPrice;
       const lucro = (r.earnings || 0) - fuelCostConsumed;
 
+      let rideDurationStr = "Não informada";
+      if (r.startTime && r.endTime) {
+        const diffMs = new Date(r.endTime).getTime() - new Date(r.startTime).getTime();
+        const diffMin = Math.round(diffMs / 60000);
+        if (diffMin > 0) {
+          const hours = Math.floor(diffMin / 60);
+          const mins = diffMin % 60;
+          rideDurationStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+        }
+      }
+
       return {
         data: r.date.toLocaleDateString('pt-BR'),
         ganhos: r.earnings,
         km: kmTotal,
         lucro: Number(lucro.toFixed(2)),
-        plataforma: r.platform
+        plataforma: r.platform,
+        duracaoTurno: rideDurationStr
       };
     });
 
@@ -77,7 +89,7 @@ export async function POST(request: NextRequest) {
       CONTEXTO DO MOTORISTA:
       - Veículo: ${vehicle?.model || 'Não cadastrado'}
       - Consumo Médio Esperado: ${vehicle?.avgConsumption || 0} km/L
-      - Últimos 10 Registros: ${JSON.stringify(statsContext)}
+      - Últimos 10 Registros (inclui ganhos, km, lucro real e duração de cada turno de trabalho): ${JSON.stringify(statsContext)}
       
       DIRETRIZES:
       1. Baseie seus conselhos nos dados reais fornecidos.

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square } from 'lucide-react';
+import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -268,6 +268,33 @@ export default function Dashboard() {
   // Custo estimado de combustível para a distância percorrida no período
   const estimatedFuelCost = totalKm > 0 ? (totalKm / realAvgConsumptionNum) * avgFuelPrice : 0;
   
+  // Cálculo de carga horária acumulada no período filtrado
+  const totalMinutes = filteredRides.reduce((acc, curr) => {
+    if (curr.startTime && curr.endTime) {
+      const diffMs = new Date(curr.endTime).getTime() - new Date(curr.startTime).getTime();
+      const diffMin = Math.round(diffMs / 60000);
+      return acc + (diffMin > 0 ? diffMin : 0);
+    }
+    return acc;
+  }, 0);
+
+  const formatDuration = (totalMin: number) => {
+    const hours = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
+
+  const formatForDateTimeInput = (dateVal: any) => {
+    if (!dateVal) return '';
+    const date = new Date(dateVal);
+    if (isNaN(date.getTime())) return '';
+    const tzoffset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - tzoffset).toISOString().slice(0, 16);
+  };
+  
   const netProfit = totalEarnings - estimatedFuelCost;
   const profitPerKm = totalKm > 0 ? netProfit / totalKm : 0;
 
@@ -328,6 +355,14 @@ export default function Dashboard() {
       trend: `R$ ${profitPerKm.toFixed(2)}/km`, 
       trendUp: true,
       color: 'var(--warning)'
+    },
+    { 
+      label: 'Tempo Rodado', 
+      value: formatDuration(totalMinutes), 
+      icon: Clock, 
+      trend: `${period}: ${(totalMinutes / 60).toFixed(1)}h`, 
+      trendUp: true,
+      color: '#ec4899'
     },
     { 
       label: 'Consumo Real', 
@@ -606,6 +641,22 @@ export default function Dashboard() {
                       value={editingItem.kmEnd || ''} 
                       onChange={e => setEditingItem({...editingItem, kmEnd: parseInt(e.target.value)})}
                       required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Início do Turno</label>
+                    <input 
+                      type="datetime-local" 
+                      value={formatForDateTimeInput(editingItem.startTime)} 
+                      onChange={e => setEditingItem({...editingItem, startTime: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Fim do Turno</label>
+                    <input 
+                      type="datetime-local" 
+                      value={formatForDateTimeInput(editingItem.endTime)} 
+                      onChange={e => setEditingItem({...editingItem, endTime: e.target.value})}
                     />
                   </div>
                   <div className="form-group full">
