@@ -314,6 +314,45 @@ export default function Dashboard() {
   const netProfit = totalEarnings - estimatedFuelCost;
   const profitPerKm = totalKm > 0 ? netProfit / totalKm : 0;
 
+  // Lógica de Desempenho Semanal (Segunda a Domingo da semana civil atual)
+  const getWeeklyPerformance = () => {
+    const now = new Date();
+    
+    // Começo da semana atual (segunda-feira 00:00:00)
+    const startOfWeek = new Date(now);
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    // Fim da semana atual (domingo 23:59:59.999)
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const weeklyGanhos = [0, 0, 0, 0, 0, 0, 0]; // Segunda a Domingo
+
+    closedRides.forEach(ride => {
+      const rideDate = new Date(ride.date);
+      if (rideDate >= startOfWeek && rideDate <= endOfWeek) {
+        const dayOfWeek = rideDate.getDay();
+        const index = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        if (index >= 0 && index < 7) {
+          weeklyGanhos[index] += (ride.earnings || 0);
+        }
+      }
+    });
+
+    const maxGanho = Math.max(...weeklyGanhos);
+
+    return {
+      weeklyGanhos,
+      maxGanho
+    };
+  };
+
+  const { weeklyGanhos, maxGanho } = getWeeklyPerformance();
+
   // Lógica de Projeção do Próximo Abastecimento
   let lastFueling: any = null;
   const allRides = rides;
@@ -487,15 +526,19 @@ export default function Dashboard() {
         </div>
         <div className="chart-placeholder">
           <div className="bars-container">
-            {[40, 70, 45, 90, 65, 80, 55].map((height, i) => (
-              <motion.div 
-                key={i} 
-                className="bar" 
-                initial={{ height: 0 }}
-                animate={{ height: `${height}%` }}
-                transition={{ delay: 0.5 + (i * 0.05), duration: 0.8 }}
-              />
-            ))}
+            {weeklyGanhos.map((ganho, i) => {
+              const height = maxGanho > 0 ? (ganho / maxGanho) * 100 : 0;
+              return (
+                <motion.div 
+                  key={i} 
+                  className="bar" 
+                  title={`Ganhos: R$ ${ganho.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                  initial={{ height: 0 }}
+                  animate={{ height: `${height}%` }}
+                  transition={{ delay: 0.5 + (i * 0.05), duration: 0.8 }}
+                />
+              );
+            })}
           </div>
           <div className="chart-labels">
             {['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map((day, i) => <span key={`${day}-${i}`}>{day}</span>)}
