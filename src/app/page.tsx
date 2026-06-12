@@ -249,16 +249,21 @@ export default function Dashboard() {
     return acc + rideLitres;
   }, 0);
 
-  const totalKmForFuel = filteredRides.reduce((acc, curr) => {
-    const hasFuel = curr.fuelings && curr.fuelings.length > 0;
-    return hasFuel ? acc + (curr.kmTotal || 0) : acc;
-  }, 0);
+  // Consumo acumulado real do período: KM total do período / Litros totais abastecidos
+  const calculatedAvgConsumption = totalLitres > 0 ? (totalKm / totalLitres) : 0;
   
-  const realAvgConsumptionNum = totalLitres > 0 
-    ? (totalKmForFuel / totalLitres) 
-    : (vehicle?.avgConsumption || 10);
+  // Consumo é consistente se estiver em uma faixa física realista (ex: entre 6 e 22 km/L)
+  const isConsumptionInconsistent = totalLitres > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
+  
+  // Para cálculos financeiros, se estiver inconsistente, usamos fallback da média cadastrada do veículo
+  const realAvgConsumptionNum = (totalLitres > 0 && !isConsumptionInconsistent)
+    ? calculatedAvgConsumption
+    : (vehicle?.avgConsumption || 14.5);
     
-  const realAvgConsumption = realAvgConsumptionNum.toFixed(1);
+  // Exibimos a média calculada para que o usuário veja a discrepância se houver litros, 
+  // ou a média do veículo se não houver registros de litros.
+  const displayAvgConsumptionNum = totalLitres > 0 ? calculatedAvgConsumption : (vehicle?.avgConsumption || 14.5);
+  const realAvgConsumption = displayAvgConsumptionNum.toFixed(1);
 
   // Custo estimado de combustível para a distância percorrida no período
   const estimatedFuelCost = totalKm > 0 ? (totalKm / realAvgConsumptionNum) * avgFuelPrice : 0;
@@ -328,9 +333,9 @@ export default function Dashboard() {
       label: 'Consumo Real', 
       value: `${realAvgConsumption} km/L`, 
       icon: Fuel, 
-      trend: period, 
-      trendUp: true,
-      color: '#8b5cf6'
+      trend: isConsumptionInconsistent ? 'Dados incompletos' : period, 
+      trendUp: !isConsumptionInconsistent,
+      color: isConsumptionInconsistent ? 'var(--warning)' : '#8b5cf6'
     },
   ];
 
@@ -370,6 +375,30 @@ export default function Dashboard() {
           <div className="alert-actions">
             <button onClick={() => handleCancelSession(activeSession._id)} className="btn-cancel">Cancelar</button>
             <Link href="/novo" className="btn-alert">Continuar</Link>
+          </div>
+        </motion.div>
+      )}
+
+      {isConsumptionInconsistent && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="active-alert card warning"
+          style={{ 
+            borderColor: 'var(--warning)', 
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(255, 255, 255, 0.7) 100%)',
+            marginBottom: '10px'
+          }}
+        >
+          <div className="alert-content">
+            <div className="pulse-icon" style={{ backgroundColor: 'var(--warning)' }} />
+            <div>
+              <h3 className="alert-title" style={{ color: '#d97706' }}>Inconsistência nos abastecimentos</h3>
+              <p className="alert-desc" style={{ color: 'var(--text-muted)' }}>
+                A média calculada de {realAvgConsumption} km/L está fora do padrão para o seu veículo. 
+                Certifique-se de registrar todos os abastecimentos no período para obter estatísticas precisas de custos.
+              </p>
+            </div>
           </div>
         </motion.div>
       )}

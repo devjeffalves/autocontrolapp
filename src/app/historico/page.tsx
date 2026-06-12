@@ -75,14 +75,31 @@ export default function Historico() {
   // Calcular preço médio do combustível baseado em todo o histórico
   let totalFuelCostForAvg = 0;
   let totalLitresForAvg = 0;
+  let totalKmForRealAvg = 0;
+
   history.forEach(r => {
+    const kmTotal = (r.kmEnd || 0) - r.kmStart;
+    const rideLitres = r.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
+    
+    totalLitresForAvg += rideLitres;
+    totalKmForRealAvg += kmTotal;
+    
     r.fuelings?.forEach((f: any) => {
       totalFuelCostForAvg += (f.cost || 0);
-      totalLitresForAvg += (f.litres || 0);
     });
   });
+
   const avgFuelPrice = totalLitresForAvg > 0 ? (totalFuelCostForAvg / totalLitresForAvg) : 5.50;
-  const avgConsumption = vehicle?.avgConsumption || 10;
+
+  // Consumo acumulado real de todo o histórico
+  const calculatedAvgConsumption = totalLitresForAvg > 0 ? (totalKmForRealAvg / totalLitresForAvg) : 0;
+  const isConsumptionInconsistent = totalLitresForAvg > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
+
+  // Média efetiva para os cálculos de combustível no histórico: 
+  // se estiver consistente, usa o calculado; senão, usa a cadastrada do veículo (padrão Kwid: 14.5)
+  const effectiveConsumption = (totalLitresForAvg > 0 && !isConsumptionInconsistent)
+    ? calculatedAvgConsumption
+    : (vehicle?.avgConsumption || 14.5);
 
   const totalEarnings = history.reduce((acc, curr) => acc + (curr.earnings || 0), 0);
   const totalKm = history.reduce((acc, curr) => acc + ((curr.kmEnd || 0) - curr.kmStart), 0);
@@ -96,7 +113,7 @@ export default function Historico() {
     if (rideFuelLitres > 0) {
       rideFuelPrice = rideFuelCost / rideFuelLitres;
     }
-    const fuelCostConsumed = (kmTotal / avgConsumption) * rideFuelPrice;
+    const fuelCostConsumed = (kmTotal / effectiveConsumption) * rideFuelPrice;
     return acc + ((curr.earnings || 0) - fuelCostConsumed);
   }, 0);
 
@@ -167,7 +184,7 @@ export default function Historico() {
                   if (rideFuelLitres > 0) {
                     rideFuelPrice = rideFuelCost / rideFuelLitres;
                   }
-                  const fuelCostConsumed = (itemKm / avgConsumption) * rideFuelPrice;
+                  const fuelCostConsumed = (itemKm / effectiveConsumption) * rideFuelPrice;
                   const lucroReal = (item.earnings || 0) - fuelCostConsumed;
 
                   return (
@@ -182,7 +199,7 @@ export default function Historico() {
                             : `${item.rides} corridas • ${itemKm.toFixed(1)}km`
                           }
                           {item.fuelings?.length > 0 && ` • ${item.fuelings.length} Abast. (R$ ${rideFuelCost.toFixed(2)})`}
-                          {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / avgConsumption).toFixed(1)}L`}
+                          {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / effectiveConsumption).toFixed(1)}L`}
                         </p>
                       </div>
                       <div className="history-earnings">

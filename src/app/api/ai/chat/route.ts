@@ -25,16 +25,24 @@ export async function POST(request: NextRequest) {
       Vehicle.findOne({})
     ]);
 
-    const vehicleAvgConsumption = vehicle?.avgConsumption || 10;
     let totalCost = 0;
     let totalLitres = 0;
+    let totalKmRides = 0;
     rides.forEach(r => {
+      totalKmRides += (r.kmTotal || 0);
       r.fuelings?.forEach((f: any) => {
         totalCost += (f.cost || 0);
         totalLitres += (f.litres || 0);
       });
     });
     const avgFuelPrice = totalLitres > 0 ? (totalCost / totalLitres) : 5.50;
+
+    const calculatedAvgConsumption = totalLitres > 0 ? (totalKmRides / totalLitres) : 0;
+    const isConsumptionInconsistent = totalLitres > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
+
+    const vehicleAvgConsumption = (totalLitres > 0 && !isConsumptionInconsistent)
+      ? calculatedAvgConsumption
+      : (vehicle?.avgConsumption || 14.5);
 
     const statsContext = rides.map(r => {
       const kmTotal = r.kmTotal || 0;

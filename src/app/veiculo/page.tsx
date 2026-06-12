@@ -43,17 +43,21 @@ export default function Veiculo() {
           const closedRides = allRides.filter((r: any) => r.status === 'closed');
           closedRides.forEach((r: any) => {
             const rideLitres = r.fuelings?.reduce((acc: number, curr: any) => acc + (curr.litres || 0), 0) || 0;
-            if (rideLitres > 0) {
-              totalLitres += rideLitres;
-              totalKm += (r.kmTotal || 0);
-            }
+            totalLitres += rideLitres;
+            totalKm += (r.kmTotal || 0);
           });
           
-          let computedAvg = vData.data?.avgConsumption || 10;
+          let computedAvg = vData.data?.avgConsumption || 14.5;
           if (totalLitres > 0) {
             const calculatedAvg = totalKm / totalLitres;
+            
+            // Consumo é consistente se estiver em uma faixa física realista (ex: entre 6 e 22 km/L)
+            const isAvgInconsistent = calculatedAvg < 6 || calculatedAvg > 22;
+            
             setRealAvg(calculatedAvg);
-            computedAvg = calculatedAvg;
+            if (!isAvgInconsistent) {
+              computedAvg = calculatedAvg;
+            }
           }
 
           // Achar o abastecimento mais recente com km gravado
@@ -97,6 +101,7 @@ export default function Veiculo() {
   }, []);
 
   const displayAvg = realAvg || vehicle.avgConsumption;
+  const isConsumptionInconsistent = realAvg !== null && (realAvg < 6 || realAvg > 22);
 
   // Auto-save logic
   useEffect(() => {
@@ -285,6 +290,17 @@ export default function Veiculo() {
             <span>Ideal</span>
             <span>Excelente</span>
           </div>
+          {isConsumptionInconsistent && (
+            <p style={{ 
+              color: 'var(--warning)', 
+              fontSize: '0.75rem', 
+              fontWeight: '600', 
+              marginTop: '12px', 
+              textAlign: 'center' 
+            }}>
+              ⚠️ Média inconsistente ({displayAvg.toFixed(1)} km/L). Certifique-se de registrar todos os abastecimentos.
+            </p>
+          )}
         </div>
       </section>
 
