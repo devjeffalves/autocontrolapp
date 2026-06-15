@@ -756,8 +756,24 @@ export default function Historico() {
           .form-group.full {
             grid-column: span 1;
           }
+          .modal-overlay {
+            padding: 10px;
+          }
           .modal-content {
             padding: 16px;
+            max-height: 85vh;
+            border-radius: 12px;
+          }
+          .quick-inputs {
+            grid-template-columns: 1fr 1fr;
+          }
+          .quick-inputs input:nth-child(3) {
+            grid-column: span 2;
+          }
+          .quick-inputs button {
+            grid-column: span 2;
+            width: 100%;
+            height: 36px;
           }
         }
 
