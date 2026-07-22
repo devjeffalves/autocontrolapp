@@ -7,6 +7,7 @@ import Link from 'next/link';
 
 export default function Dashboard() {
   const [period, setPeriod] = useState('Semana');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [rides, setRides] = useState<any[]>([]);
   const [vehicle, setVehicle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -218,6 +219,13 @@ export default function Dashboard() {
       return rideDate >= weekAgo;
     } else if (period === 'Mês') {
       return rideDate.getMonth() === now.getMonth() && rideDate.getFullYear() === now.getFullYear();
+    } else if (period === 'Escolher Mês') {
+      if (selectedMonth) {
+        const [yearStr, monthStr] = selectedMonth.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10) - 1;
+        return rideDate.getFullYear() === year && rideDate.getMonth() === month;
+      }
     } else if (period === 'Ano') {
       return rideDate.getFullYear() === now.getFullYear();
     }
@@ -438,16 +446,39 @@ export default function Dashboard() {
           <p className="greeting">Olá, {vehicle?.model || 'Motorista'}</p>
           <h1 className="title">Seu Resumo</h1>
         </div>
-        <div className="period-selector glass">
-          {['Dia', 'Semana', 'Mês', 'Ano', 'Tudo'].map((p) => (
-            <button 
-              key={p} 
-              className={`period-btn ${period === p ? 'active' : ''}`}
-              onClick={() => setPeriod(p)}
+        <div className="period-container">
+          <div className="period-selector glass">
+            {[
+              { id: 'Dia', label: 'Dia' },
+              { id: 'Semana', label: 'Semana' },
+              { id: 'Mês', label: 'Este Mês' },
+              { id: 'Escolher Mês', label: 'Escolher Mês 📅' },
+              { id: 'Ano', label: 'Ano' },
+              { id: 'Tudo', label: 'Tudo' },
+            ].map((p) => (
+              <button 
+                key={p.id} 
+                className={`period-btn ${period === p.id ? 'active' : ''}`}
+                onClick={() => setPeriod(p.id)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {period === 'Escolher Mês' && (
+            <motion.div 
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="month-picker-wrapper glass"
             >
-              {p}
-            </button>
-          ))}
+              <label>Selecione Mês/Ano:</label>
+              <input 
+                type="month" 
+                value={selectedMonth} 
+                onChange={e => setSelectedMonth(e.target.value)} 
+              />
+            </motion.div>
+          )}
         </div>
       </header>
 
@@ -868,8 +899,9 @@ export default function Dashboard() {
         .header {
           display: flex;
           justify-content: space-between;
-          align-items: flex-end;
+          align-items: flex-start;
           margin-top: 10px;
+          gap: 12px;
         }
 
         .greeting {
@@ -883,19 +915,28 @@ export default function Dashboard() {
           font-weight: 700;
         }
 
+        .period-container {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 8px;
+        }
+
         .period-selector {
           display: flex;
+          flex-wrap: wrap;
           padding: 4px;
           border-radius: 12px;
+          gap: 2px;
         }
 
         .period-btn {
           background: transparent;
           border: none;
           color: var(--text-muted);
-          padding: 6px 12px;
+          padding: 6px 10px;
           border-radius: 8px;
-          font-size: 0.75rem;
+          font-size: 0.725rem;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.2s;
@@ -904,6 +945,30 @@ export default function Dashboard() {
         .period-btn.active {
           background: var(--primary);
           color: white;
+        }
+
+        .month-picker-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          border-radius: 10px;
+          background: white;
+        }
+
+        .month-picker-wrapper label {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--text-muted);
+        }
+
+        .month-picker-wrapper input {
+          border: 1px solid var(--card-border);
+          border-radius: 6px;
+          padding: 4px 8px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--foreground);
         }
 
         .stat-header {
