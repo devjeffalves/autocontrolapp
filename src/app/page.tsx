@@ -218,8 +218,10 @@ export default function Dashboard() {
       return rideDate >= weekAgo;
     } else if (period === 'Mês') {
       return rideDate.getMonth() === now.getMonth() && rideDate.getFullYear() === now.getFullYear();
+    } else if (period === 'Ano') {
+      return rideDate.getFullYear() === now.getFullYear();
     }
-    return true;
+    return true; // 'Tudo'
   });
 
   // Cálculos baseados nos dados filtrados
@@ -437,7 +439,7 @@ export default function Dashboard() {
           <h1 className="title">Seu Resumo</h1>
         </div>
         <div className="period-selector glass">
-          {['Dia', 'Semana', 'Mês'].map((p) => (
+          {['Dia', 'Semana', 'Mês', 'Ano', 'Tudo'].map((p) => (
             <button 
               key={p} 
               className={`period-btn ${period === p ? 'active' : ''}`}
