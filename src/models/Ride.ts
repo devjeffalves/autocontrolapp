@@ -7,6 +7,11 @@ export interface IFueling {
   km?: number;
 }
 
+export interface IPause {
+  startTime: Date;
+  endTime?: Date;
+}
+
 export interface IRide extends Document {
   platform: 'Aplicativos' | 'Passeio';
   rides: number;
@@ -14,8 +19,9 @@ export interface IRide extends Document {
   kmEnd?: number;
   kmTotal?: number;
   fuelings: IFueling[];
+  pauses?: IPause[];
   earnings: number;
-  status: 'open' | 'closed';
+  status: 'open' | 'paused' | 'closed';
   startTime?: Date;
   endTime?: Date;
   date: Date;
@@ -34,13 +40,16 @@ const RideSchema: Schema = new Schema({
     date: { type: Date, default: Date.now },
     km: { type: Number }
   }],
+  pauses: [{
+    startTime: { type: Date, required: true },
+    endTime: { type: Date }
+  }],
   earnings: { type: Number, default: 0 },
-  status: { type: String, enum: ['open', 'closed'], default: 'open' },
+  status: { type: String, enum: ['open', 'paused', 'closed'], default: 'open' },
   startTime: { type: Date },
   endTime: { type: Date },
   date: { type: Date, required: true, default: Date.now },
   createdAt: { type: Date, default: Date.now },
 });
-
 
 export default mongoose.models.Ride || mongoose.model<IRide>('Ride', RideSchema);

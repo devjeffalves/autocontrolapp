@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus, Mic, MicOff } from 'lucide-react';
+import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus, Mic, MicOff, Pause, Coffee } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NovoRegistro() {
@@ -250,6 +250,57 @@ export default function NovoRegistro() {
     }
   };
 
+  const handleStandaloneFueling = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/rides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...fuelData, action: 'standalone_fueling' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setNotification({ type: 'success', message: 'Abastecimento avulso registrado com sucesso!' });
+        setFuelData({ fuelCost: '', fuelLitres: '', fuelKm: '' });
+      } else {
+        setNotification({ type: 'error', message: json.error });
+      }
+    } catch (err) {
+      setNotification({ type: 'error', message: 'Erro na conexão.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleTogglePause = async () => {
+    if (!activeSession) return;
+    const isPaused = activeSession.status === 'paused';
+    const action = isPaused ? 'resume' : 'pause';
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/rides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setNotification({ 
+          type: 'success', 
+          message: isPaused ? 'Turno retomado! ▶️' : 'Turno pausado! ⏸️' 
+        });
+        fetchActiveSession();
+      } else {
+        setNotification({ type: 'error', message: json.error });
+      }
+    } catch (err) {
+      setNotification({ type: 'error', message: 'Erro ao alterar pausa.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleFinishShift = async (e: React.FormEvent) => {
     e.preventDefault();
     if (Number(finishData.kmEnd) <= activeSession.kmStart) {
@@ -324,103 +375,187 @@ export default function NovoRegistro() {
 
       <div className="form-container">
         {!activeSession ? (
-          <motion.form 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            onSubmit={handleStartShift} 
-            className="card animate-in"
-          >
-            <div className="status-badge start">Início do Dia</div>
-            <p className="description">Registre o KM inicial para começar a registrar sua atividade de hoje.</p>
-            
-            <div className="input-group">
-              <label><Navigation size={14} /> KM Inicial</label>
-              <input 
-                type="number" 
-                placeholder="Ex: 45000"
-                value={startData.kmStart}
-                onChange={e => setStartData({...startData, kmStart: e.target.value})}
-                required
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="input-group">
-              <label>Data e Hora de Início</label>
-              <input 
-                type="datetime-local" 
-                value={startData.startTime}
-                onChange={e => setStartData({...startData, startTime: e.target.value})}
-                required
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="input-group">
-              <label>Tipo de Atividade</label>
-              <div className="platform-toggle">
-                <button 
-                  type="button" 
-                  className={`toggle-btn ${startData.platform !== 'Passeio' ? 'active aplicativos' : ''}`}
-                  onClick={() => setStartData({...startData, platform: 'Aplicativos'})}
-                >Trabalho</button>
-                <button 
-                  type="button" 
-                  className={`toggle-btn ${startData.platform === 'Passeio' ? 'active tour' : ''}`}
-                  onClick={() => setStartData({...startData, platform: 'Passeio'})}
-                >Passeio</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <motion.form 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onSubmit={handleStartShift} 
+              className="card animate-in"
+            >
+              <div className="status-badge start">Início do Turno</div>
+              <p className="description">Registre o KM inicial para começar a registrar sua atividade de hoje.</p>
+              
+              <div className="input-group">
+                <label><Navigation size={14} /> KM Inicial</label>
+                <input 
+                  type="number" 
+                  placeholder="Ex: 45000"
+                  value={startData.kmStart}
+                  onChange={e => setStartData({...startData, kmStart: e.target.value})}
+                  required
+                  disabled={submitting}
+                />
               </div>
-            </div>
 
-            <button type="submit" className="btn-primary" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : <Play size={18} />}
-              Iniciar Turno
-            </button>
-          </motion.form>
+              <div className="input-group">
+                <label>Data e Hora de Início</label>
+                <input 
+                  type="datetime-local" 
+                  value={startData.startTime}
+                  onChange={e => setStartData({...startData, startTime: e.target.value})}
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="input-group">
+                <label>Tipo de Atividade</label>
+                <div className="platform-toggle">
+                  <button 
+                    type="button" 
+                    className={`toggle-btn ${startData.platform !== 'Passeio' ? 'active aplicativos' : ''}`}
+                    onClick={() => setStartData({...startData, platform: 'Aplicativos'})}
+                  >Trabalho</button>
+                  <button 
+                    type="button" 
+                    className={`toggle-btn ${startData.platform === 'Passeio' ? 'active tour' : ''}`}
+                    onClick={() => setStartData({...startData, platform: 'Passeio'})}
+                  >Passeio</button>
+                </div>
+              </div>
+
+              <button type="submit" className="btn-primary" disabled={submitting}>
+                {submitting ? <Loader2 className="animate-spin" /> : <Play size={18} />}
+                Iniciar Turno
+              </button>
+            </motion.form>
+
+            {/* Abastecimento Avulso (Sem abrir turno) */}
+            <motion.form 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onSubmit={handleStandaloneFueling} 
+              className="card glass"
+            >
+              <h2 className="section-title"><Droplets size={18} /> Abastecimento Avulso (Fora de Turno)</h2>
+              <p className="description" style={{ fontSize: '0.75rem', marginBottom: '12px' }}>
+                Abasteceu o carro sem estar trabalhando em um turno? Registre aqui diretamente no histórico de combustível.
+              </p>
+              <div className="input-row">
+                <div className="input-group">
+                  <label>Valor (R$)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    placeholder="0,00"
+                    value={fuelData.fuelCost}
+                    onChange={e => setFuelData({...fuelData, fuelCost: e.target.value})}
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+                <div className="input-group">
+                  <label>Litros</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    placeholder="0.00"
+                    value={fuelData.fuelLitres}
+                    onChange={e => setFuelData({...fuelData, fuelLitres: e.target.value})}
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+                <div className="input-group">
+                  <label>KM no Posto (Opcional)</label>
+                  <input 
+                    type="number" 
+                    placeholder="KM Atual"
+                    value={fuelData.fuelKm}
+                    onChange={e => setFuelData({...fuelData, fuelKm: e.target.value})}
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+              <button type="submit" className="btn-secondary" disabled={submitting}>
+                <Plus size={18} /> Salvar Abastecimento Avulso
+              </button>
+            </motion.form>
+          </div>
         ) : (
           <div className="active-session-flow">
             {/* Status do Turno */}
             <div className="card status-summary">
-              <div className="status-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="status-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <div className="status-badge open">Turno em Aberto</div>
+                  <div className={`status-badge ${activeSession.status === 'paused' ? 'paused' : 'open'}`} style={{
+                    background: activeSession.status === 'paused' ? '#fef3c7' : undefined,
+                    color: activeSession.status === 'paused' ? '#b45309' : undefined,
+                    border: activeSession.status === 'paused' ? '1px solid #fde68a' : undefined
+                  }}>
+                    {activeSession.status === 'paused' ? 'Turno em Pausa ⏸️' : 'Turno em Aberto 🟢'}
+                  </div>
                   <span className="date">{new Date(activeSession.startTime || activeSession.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
-                <button 
-                  onClick={async () => {
-                    if (!confirm('Deseja realmente cancelar e excluir este turno iniciado? Todos os dados não salvos serão perdidos.')) return;
-                    setSubmitting(true);
-                    try {
-                      const res = await fetch(`/api/rides/${activeSession._id}`, { method: 'DELETE' });
-                      const json = await res.json();
-                      if (json.success) {
-                        setNotification({ type: 'success', message: 'Turno excluído com sucesso!' });
-                        setActiveSession(null);
-                        fetchActiveSession();
-                      } else {
-                        setNotification({ type: 'error', message: json.error });
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button 
+                    type="button"
+                    onClick={handleTogglePause}
+                    disabled={submitting}
+                    style={{
+                      background: activeSession.status === 'paused' ? '#dcfce7' : '#fef3c7',
+                      color: activeSession.status === 'paused' ? '#166534' : '#92400e',
+                      border: activeSession.status === 'paused' ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                      padding: '5px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {activeSession.status === 'paused' ? <Play size={14} /> : <Pause size={14} />}
+                    {activeSession.status === 'paused' ? 'Retomar Turno' : 'Pausar Turno'}
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      if (!confirm('Deseja realmente cancelar e excluir este turno iniciado? Todos os dados não salvos serão perdidos.')) return;
+                      setSubmitting(true);
+                      try {
+                        const res = await fetch(`/api/rides/${activeSession._id}`, { method: 'DELETE' });
+                        const json = await res.json();
+                        if (json.success) {
+                          setNotification({ type: 'success', message: 'Turno excluído com sucesso!' });
+                          setActiveSession(null);
+                          fetchActiveSession();
+                        } else {
+                          setNotification({ type: 'error', message: json.error });
+                        }
+                      } catch (err) {
+                        setNotification({ type: 'error', message: 'Erro ao cancelar o turno.' });
+                      } finally {
+                        setSubmitting(false);
                       }
-                    } catch (err) {
-                      setNotification({ type: 'error', message: 'Erro ao cancelar o turno.' });
-                    } finally {
-                      setSubmitting(false);
-                    }
-                  }}
-                  className="btn-cancel"
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    color: '#ef4444',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    padding: '4px 10px',
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  Excluir Turno
-                </button>
+                    }}
+                    className="btn-cancel"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      padding: '5px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Excluir Turno
+                  </button>
+                </div>
               </div>
               <div className="mini-stats" style={{ marginTop: '12px' }}>
                 <div className="mini-stat">
@@ -449,7 +584,7 @@ export default function NovoRegistro() {
               onSubmit={handleAddFueling} 
               className="card glass"
             >
-              <h2 className="section-title"><Droplets size={18} /> Registrar Abastecimento</h2>
+              <h2 className="section-title"><Droplets size={18} /> Registrar Abastecimento do Turno</h2>
               <div className="input-row">
                 <div className="input-group">
                   <label>Valor (R$)</label>
@@ -502,7 +637,6 @@ export default function NovoRegistro() {
             >
               <h2 className="section-title"><Check size={18} /> Finalizar Dia</h2>
               
-
 
               <div className="input-row">
                 <div className="input-group">

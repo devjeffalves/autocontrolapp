@@ -214,9 +214,17 @@ export default function Dashboard() {
     if (period === 'Dia') {
       return rideDate.toDateString() === now.toDateString();
     } else if (period === 'Semana') {
-      const weekAgo = new Date();
-      weekAgo.setDate(now.getDate() - 7);
-      return rideDate >= weekAgo;
+      const day = now.getDay();
+      const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(now);
+      monday.setDate(diffToMonday);
+      monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      return rideDate >= monday && rideDate <= sunday;
     } else if (period === 'Mês') {
       return rideDate.getMonth() === now.getMonth() && rideDate.getFullYear() === now.getFullYear();
     } else if (period === 'Escolher Mês') {
@@ -1250,34 +1258,34 @@ export default function Dashboard() {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(0, 0, 0, 0.5);
           backdrop-filter: blur(4px);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1000;
-          padding: 20px;
-          overflow-y: auto;
+          z-index: 2000;
+          padding: 12px;
         }
 
         .modal-content {
           width: 100%;
           max-width: 450px;
-          padding: 24px;
+          padding: 20px;
           background: white;
           border-radius: 16px;
           margin: auto;
-          max-height: 90vh;
+          max-height: 85dvh;
           display: flex;
           flex-direction: column;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+          overflow: hidden;
         }
 
         .modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 20px;
+          margin-bottom: 14px;
           flex-shrink: 0;
         }
 
@@ -1291,26 +1299,28 @@ export default function Dashboard() {
           border: none;
           color: var(--text-muted);
           cursor: pointer;
+          padding: 4px;
         }
 
         .edit-form {
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 14px;
           overflow-y: auto;
           padding-right: 4px;
+          flex: 1;
         }
 
         .form-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 16px;
+          gap: 12px;
         }
 
         .form-group {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 4px;
         }
 
         .form-group.full {
@@ -1324,7 +1334,7 @@ export default function Dashboard() {
         }
 
         .form-group input, .form-group select {
-          padding: 10px 12px;
+          padding: 9px 12px;
           border-radius: 8px;
           border: 1px solid var(--glass-border);
           background: #f8fafc;
@@ -1345,6 +1355,7 @@ export default function Dashboard() {
           font-weight: 700;
           cursor: pointer;
           transition: all 0.2s;
+          flex-shrink: 0;
         }
 
         .save-btn:hover {
@@ -1593,12 +1604,12 @@ export default function Dashboard() {
             grid-column: span 1;
           }
           .modal-overlay {
-            padding: 10px;
+            padding: 8px;
           }
           .modal-content {
-            padding: 16px;
-            max-height: 85vh;
-            border-radius: 12px;
+            padding: 14px;
+            max-height: 82dvh;
+            border-radius: 14px;
           }
           .quick-inputs {
             grid-template-columns: 1fr 1fr;
@@ -1609,7 +1620,7 @@ export default function Dashboard() {
           .quick-inputs button {
             grid-column: span 2;
             width: 100%;
-            height: 36px;
+            height: 34px;
           }
         }
 

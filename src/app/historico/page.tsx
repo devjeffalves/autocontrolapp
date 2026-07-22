@@ -150,8 +150,17 @@ export default function Historico() {
           itemDate.getFullYear() === now.getFullYear();
         if (!isToday) return false;
       } else if (periodFilter === 'semana') {
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        if (itemDate < sevenDaysAgo) return false;
+        const day = now.getDay();
+        const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(now);
+        monday.setDate(diffToMonday);
+        monday.setHours(0, 0, 0, 0);
+
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+
+        if (itemDate < monday || itemDate > sunday) return false;
       } else if (periodFilter === 'mes') {
         const isThisMonth = itemDate.getMonth() === now.getMonth() &&
           itemDate.getFullYear() === now.getFullYear();
@@ -1218,34 +1227,34 @@ export default function Historico() {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(0, 0, 0, 0.5);
           backdrop-filter: blur(4px);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1000;
-          padding: 20px;
-          overflow-y: auto;
+          z-index: 2000;
+          padding: 12px;
         }
 
         .modal-content {
           width: 100%;
           max-width: 450px;
-          padding: 24px;
+          padding: 20px;
           background: white;
           border-radius: 16px;
           margin: auto;
-          max-height: 90vh;
+          max-height: 85dvh;
           display: flex;
           flex-direction: column;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+          overflow: hidden;
         }
 
         .modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 20px;
+          margin-bottom: 14px;
           flex-shrink: 0;
         }
 
@@ -1259,26 +1268,28 @@ export default function Historico() {
           border: none;
           color: var(--text-muted);
           cursor: pointer;
+          padding: 4px;
         }
 
         .edit-form {
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 14px;
           overflow-y: auto;
           padding-right: 4px;
+          flex: 1;
         }
 
         .form-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 16px;
+          gap: 12px;
         }
 
         .form-group {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 4px;
         }
 
         .form-group.full {
@@ -1292,7 +1303,7 @@ export default function Historico() {
         }
 
         .form-group input, .form-group select {
-          padding: 10px 12px;
+          padding: 9px 12px;
           border-radius: 8px;
           border: 1px solid var(--glass-border);
           background: #f8fafc;
@@ -1313,6 +1324,7 @@ export default function Historico() {
           font-weight: 700;
           cursor: pointer;
           transition: all 0.2s;
+          flex-shrink: 0;
         }
 
         .save-btn:hover {
@@ -1322,15 +1334,15 @@ export default function Historico() {
 
         .modal-fuelings-section {
           border-top: 1px solid var(--glass-border);
-          padding-top: 16px;
-          margin-top: 8px;
+          padding-top: 12px;
+          margin-top: 4px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 10px;
         }
 
         .fuelings-title {
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           font-weight: 700;
           color: var(--text-muted);
           text-transform: uppercase;
@@ -1339,13 +1351,13 @@ export default function Historico() {
         .modal-fuelings-list {
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          max-height: 120px;
+          gap: 6px;
+          max-height: 100px;
           overflow-y: auto;
         }
 
         .no-fuelings {
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           color: var(--text-muted);
           font-style: italic;
         }
@@ -1355,9 +1367,9 @@ export default function Historico() {
           justify-content: space-between;
           align-items: center;
           background: #f8fafc;
-          padding: 8px 12px;
+          padding: 6px 10px;
           border-radius: 6px;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           font-weight: 600;
           border: 1px solid #f1f5f9;
         }
@@ -1378,13 +1390,13 @@ export default function Historico() {
           flex-direction: column;
           gap: 8px;
           background: #f8fafc;
-          padding: 12px;
+          padding: 10px;
           border-radius: 8px;
           border: 1px dashed var(--glass-border);
         }
 
         .add-fueling-quick h5 {
-          font-size: 0.75rem;
+          font-size: 0.725rem;
           font-weight: 700;
           color: var(--text-muted);
         }
@@ -1392,7 +1404,7 @@ export default function Historico() {
         .quick-inputs {
           display: grid;
           grid-template-columns: 1fr 1fr 1fr auto;
-          gap: 8px;
+          gap: 6px;
           align-items: center;
         }
 
@@ -1430,15 +1442,29 @@ export default function Historico() {
           }
           .form-grid {
             grid-template-columns: 1fr;
+            gap: 10px;
           }
           .form-group.full {
             grid-column: span 1;
           }
           .modal-overlay {
-            padding: 10px;
+            padding: 8px;
           }
           .modal-content {
-            padding: 16px;
+            padding: 14px;
+            max-height: 82dvh;
+            border-radius: 14px;
+          }
+          .quick-inputs {
+            grid-template-columns: 1fr 1fr;
+          }
+          .quick-inputs input:nth-child(3) {
+            grid-column: span 2;
+          }
+          .quick-inputs button {
+            grid-column: span 2;
+            width: 100%;
+            height: 34px;
           }
         }
       `}</style>
