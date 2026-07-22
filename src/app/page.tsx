@@ -332,44 +332,78 @@ export default function Dashboard() {
   const netProfit = totalEarnings - estimatedFuelCost;
   const profitPerKm = totalKm > 0 ? netProfit / totalKm : 0;
 
-  // Lógica de Desempenho Semanal (Segunda a Domingo da semana civil atual)
+  // Lógica de Desempenho Semanal / Diário (Segunda a Domingo)
   const getWeeklyPerformance = () => {
     const now = new Date();
     
-    // Começo da semana atual (segunda-feira 00:00:00)
-    const startOfWeek = new Date(now);
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    // Se houver corridas no período filtrado, usamos esse contexto para o gráfico
+    const ridesForChart = filteredRides.length > 0 ? filteredRides : closedRides;
+
+    // Se estiver no filtro 'Escolher Mês', usamos a referência do mês selecionado
+    let referenceDate = now;
+    if (period === 'Escolher Mês' && selectedMonth) {
+      const [y, m] = selectedMonth.split('-');
+      referenceDate = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 15);
+    } else if (ridesForChart.length > 0) {
+      referenceDate = new Date(ridesForChart[0].date);
+    }
+
+    const startOfWeek = new Date(referenceDate);
+    const day = referenceDate.getDay();
+    const diff = referenceDate.getDate() - day + (day === 0 ? -6 : 1);
     startOfWeek.setDate(diff);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    // Fim da semana atual (domingo 23:59:59.999)
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    const weeklyGanhos = [0, 0, 0, 0, 0, 0, 0]; // Segunda a Domingo
+    const weeklyGanhos = [0, 0, 0, 0, 0, 0, 0]; // Seg a Dom
+    const weeklyRidesCount = [0, 0, 0, 0, 0, 0, 0];
+    const weeklyKmCount = [0, 0, 0, 0, 0, 0, 0];
 
-    closedRides.forEach(ride => {
+    ridesForChart.forEach(ride => {
       const rideDate = new Date(ride.date);
       if (rideDate >= startOfWeek && rideDate <= endOfWeek) {
         const dayOfWeek = rideDate.getDay();
         const index = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
         if (index >= 0 && index < 7) {
           weeklyGanhos[index] += (ride.earnings || 0);
+          weeklyRidesCount[index] += (ride.rides || 0);
+          weeklyKmCount[index] += (ride.kmTotal || 0);
         }
       }
     });
 
-    const maxGanho = Math.max(...weeklyGanhos);
+    const totalWeeklyGanhos = weeklyGanhos.reduce((a, b) => a + b, 0);
+    const activeDaysCount = weeklyGanhos.filter(g => g > 0).length;
+    const avgDailyGanhos = activeDaysCount > 0 ? (totalWeeklyGanhos / activeDaysCount) : 0;
+    const maxGanho = Math.max(...weeklyGanhos, 1);
+
+    const dayLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
     return {
       weeklyGanhos,
-      maxGanho
+      weeklyRidesCount,
+      weeklyKmCount,
+      totalWeeklyGanhos,
+      avgDailyGanhos,
+      maxGanho,
+      dayLabels,
+      periodRangeStr: `${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} a ${endOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
     };
   };
 
-  const { weeklyGanhos, maxGanho } = getWeeklyPerformance();
+  const { 
+    weeklyGanhos, 
+    weeklyRidesCount, 
+    weeklyKmCount, 
+    totalWeeklyGanhos, 
+    avgDailyGanhos, 
+    maxGanho, 
+    dayLabels, 
+    periodRangeStr 
+  } = getWeeklyPerformance();
 
   // Lógica de Projeção do Próximo Abastecimento
   let lastFueling: any = null;
@@ -561,28 +595,53 @@ export default function Dashboard() {
       </section>
 
       <section className="chart-section card">
-        <div className="section-header">
-          <h3 className="section-title">Desempenho Semanal</h3>
-          <TrendingUp size={18} className="text-muted" />
+        <div className="section-header" style={{ marginBottom: '8px' }}>
+          <div>
+            <h3 className="section-title">Desempenho Semanal</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+              Semana: {periodRangeStr}
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '700' }}>Total Semana</span>
+            <p style={{ fontSize: '1.05rem', fontWeight: '800', color: 'var(--primary)' }}>
+              R$ {totalWeeklyGanhos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
         </div>
-        <div className="chart-placeholder">
-          <div className="bars-container">
+
+        {totalWeeklyGanhos > 0 && (
+          <div className="weekly-sub-info">
+            <span>Média/dia ativo: <strong>R$ {avgDailyGanhos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
+          </div>
+        )}
+
+        <div className="chart-container-enhanced">
+          <div className="bars-container-enhanced">
             {weeklyGanhos.map((ganho, i) => {
               const height = maxGanho > 0 ? (ganho / maxGanho) * 100 : 0;
+              const hasEarnings = ganho > 0;
               return (
-                <motion.div 
-                  key={i} 
-                  className="bar" 
-                  title={`Ganhos: R$ ${ganho.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                  initial={{ height: 0 }}
-                  animate={{ height: `${height}%` }}
-                  transition={{ delay: 0.5 + (i * 0.05), duration: 0.8 }}
-                />
+                <div key={i} className="bar-column">
+                  <div className="bar-value-label">
+                    {hasEarnings ? `R$${Math.round(ganho)}` : ''}
+                  </div>
+                  <div className="bar-track">
+                    <motion.div 
+                      className={`bar-fill ${hasEarnings ? 'active' : ''}`}
+                      style={{ height: `${Math.max(height, hasEarnings ? 8 : 4)}%` }}
+                      initial={{ height: 0 }}
+                      animate={{ height: `${Math.max(height, hasEarnings ? 8 : 4)}%` }}
+                      transition={{ delay: 0.2 + (i * 0.05), duration: 0.6 }}
+                      title={`${dayLabels[i]}: R$ ${ganho.toFixed(2)} (${weeklyRidesCount[i]} corridas • ${weeklyKmCount[i]} km)`}
+                    />
+                  </div>
+                  <div className="bar-day-label">
+                    <span>{dayLabels[i]}</span>
+                  </div>
+                </div>
               );
             })}
-          </div>
-          <div className="chart-labels">
-            {['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map((day, i) => <span key={`${day}-${i}`}>{day}</span>)}
           </div>
         </div>
       </section>
@@ -1029,33 +1088,73 @@ export default function Dashboard() {
           font-weight: 600;
         }
 
-        .chart-placeholder {
-          height: 120px;
+        .weekly-sub-info {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          margin-bottom: 12px;
+          background: #f8fafc;
+          padding: 6px 12px;
+          border-radius: 8px;
+          display: inline-block;
+        }
+
+        .chart-container-enhanced {
+          margin-top: 6px;
+        }
+
+        .bars-container-enhanced {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 6px;
+          align-items: flex-end;
+          height: 140px;
+        }
+
+        .bar-column {
           display: flex;
           flex-direction: column;
-          justify-content: flex-end;
-          gap: 12px;
+          align-items: center;
+          height: 100%;
         }
 
-        .bars-container {
+        .bar-value-label {
+          font-size: 0.65rem;
+          font-weight: 800;
+          color: var(--primary);
+          height: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          white-space: nowrap;
+        }
+
+        .bar-track {
+          flex: 1;
+          width: 100%;
+          max-width: 28px;
+          background: #f1f5f9;
+          border-radius: 8px;
           display: flex;
           align-items: flex-end;
-          justify-content: space-between;
-          height: 80px;
-          padding: 0 10px;
+          overflow: hidden;
         }
 
-        .bar {
-          width: 12%;
-          background: linear-gradient(to top, var(--primary), var(--primary-glow));
-          border-radius: 4px 4px 0 0;
+        .bar-fill {
+          width: 100%;
+          background: #cbd5e1;
+          border-radius: 8px;
+          transition: all 0.3s ease;
         }
 
-        .chart-labels {
-          display: flex;
-          justify-content: space-between;
-          padding: 0 10px;
-          font-size: 0.625rem;
+        .bar-fill.active {
+          background: linear-gradient(to top, var(--primary), #6366f1);
+          box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+        }
+
+        .bar-day-label {
+          margin-top: 6px;
+          font-size: 0.7rem;
+          font-weight: 700;
           color: var(--text-muted);
         }
 

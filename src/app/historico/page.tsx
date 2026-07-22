@@ -24,6 +24,7 @@ export default function Historico() {
   const [endDate, setEndDate] = useState('');
   const [platformFilter, setPlatformFilter] = useState<'todos' | 'Aplicativos' | 'Passeio'>('todos');
   const [sortBy, setSortBy] = useState<'recentes' | 'antigos' | 'lucro_desc' | 'ganhos_desc' | 'km_desc'>('recentes');
+  const [viewMode, setViewMode] = useState<'rides' | 'fuelings'>('rides');
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -280,6 +281,121 @@ export default function Historico() {
     };
   }, [filteredHistory, globalConsumptionNum, avgFuelPrice]);
 
+  // Extração e filtragem de abastecimentos para a pesquisa de Gastos com Combustível
+  const filteredFuelings = useMemo(() => {
+    const list: Array<{
+      id: string;
+      rideId: string;
+      cost: number;
+      litres: number;
+      pricePerLitre: number;
+      date: Date;
+      km?: number;
+      platform: string;
+    }> = [];
+
+    const now = new Date();
+
+    history.forEach((ride) => {
+      if (ride.fuelings && ride.fuelings.length > 0) {
+        ride.fuelings.forEach((f: any, fIdx: number) => {
+          const itemDate = new Date(f.date || ride.date || ride.createdAt || Date.now());
+
+          // 1. Filtro por Período
+          if (periodFilter === 'hoje') {
+            const isToday = itemDate.getDate() === now.getDate() &&
+              itemDate.getMonth() === now.getMonth() &&
+              itemDate.getFullYear() === now.getFullYear();
+            if (!isToday) return;
+          } else if (periodFilter === 'semana') {
+            const day = now.getDay();
+            const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(now);
+            monday.setDate(diffToMonday);
+            monday.setHours(0, 0, 0, 0);
+
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            sunday.setHours(23, 59, 59, 999);
+
+            if (itemDate < monday || itemDate > sunday) return;
+          } else if (periodFilter === 'mes') {
+            const isThisMonth = itemDate.getMonth() === now.getMonth() &&
+              itemDate.getFullYear() === now.getFullYear();
+            if (!isThisMonth) return;
+          } else if (periodFilter === 'selecionar_mes') {
+            if (selectedMonth) {
+              const [yearStr, monthStr] = selectedMonth.split('-');
+              const year = parseInt(yearStr, 10);
+              const month = parseInt(monthStr, 10) - 1;
+              const isSelectedMonth = itemDate.getFullYear() === year && itemDate.getMonth() === month;
+              if (!isSelectedMonth) return;
+            }
+          } else if (periodFilter === 'ano') {
+            if (itemDate.getFullYear() !== now.getFullYear()) return;
+          } else if (periodFilter === 'custom') {
+            if (startDate) {
+              const sDate = new Date(startDate);
+              sDate.setHours(0, 0, 0, 0);
+              if (itemDate < sDate) return;
+            }
+            if (endDate) {
+              const eDate = new Date(endDate);
+              eDate.setHours(23, 59, 59, 999);
+              if (itemDate > eDate) return;
+            }
+          }
+
+          // 2. Busca por texto
+          if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            const costMatch = (f.cost || 0).toString().includes(query);
+            const litresMatch = (f.litres || 0).toString().includes(query);
+            const dateMatch = itemDate.toLocaleDateString('pt-BR').includes(query);
+            const kmMatch = (f.km || 0).toString().includes(query);
+
+            if (!costMatch && !litresMatch && !dateMatch && !kmMatch) {
+              return;
+            }
+          }
+
+          const pricePerLitre = f.litres > 0 ? (f.cost / f.litres) : 0;
+          list.push({
+            id: `${ride._id}-${fIdx}`,
+            rideId: ride._id,
+            cost: f.cost || 0,
+            litres: f.litres || 0,
+            pricePerLitre,
+            date: itemDate,
+            km: f.km || (ride.kmEnd ? ride.kmEnd : ride.kmStart),
+            platform: ride.platform
+          });
+        });
+      }
+    });
+
+    return list.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [history, periodFilter, selectedMonth, startDate, endDate, searchQuery]);
+
+  const fuelMetrics = useMemo(() => {
+    let totalSpent = 0;
+    let totalLitres = 0;
+
+    filteredFuelings.forEach(f => {
+      totalSpent += f.cost;
+      totalLitres += f.litres;
+    });
+
+    const avgPricePerLitre = totalLitres > 0 ? (totalSpent / totalLitres) : 0;
+
+    return {
+      totalSpent,
+      totalLitres,
+      avgPricePerLitre,
+      count: filteredFuelings.length
+    };
+  }, [filteredFuelings]);
+
   const hasActiveFilters = searchQuery !== '' || periodFilter !== 'tudo' || platformFilter !== 'todos' || sortBy !== 'recentes';
 
   return (
@@ -299,12 +415,28 @@ export default function Historico() {
         </button>
       </header>
 
+      {/* Abas de Navegação de Visualização */}
+      <div className="view-mode-tabs">
+        <button 
+          className={`view-tab ${viewMode === 'rides' ? 'active' : ''}`}
+          onClick={() => setViewMode('rides')}
+        >
+          <Navigation size={16} /> Turnos & Corridas ({filteredHistory.length})
+        </button>
+        <button 
+          className={`view-tab ${viewMode === 'fuelings' ? 'active' : ''}`}
+          onClick={() => setViewMode('fuelings')}
+        >
+          <Fuel size={16} /> Gastos com Combustível ({filteredFuelings.length})
+        </button>
+      </div>
+
       {/* Barra de Busca Rápida */}
       <div className="search-bar card glass">
         <Search size={18} className="text-muted" />
         <input 
           type="text" 
-          placeholder="Buscar por data, valor, km ou plataforma..." 
+          placeholder={viewMode === 'rides' ? "Buscar por data, valor, km ou plataforma..." : "Buscar por valor (R$), litros, data ou km..."} 
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
         />
@@ -312,6 +444,49 @@ export default function Historico() {
           <button className="clear-search" onClick={() => setSearchQuery('')}>
             <X size={16} />
           </button>
+        )}
+      </div>
+
+      {/* Barra Rápida de Seleção de Período & Filtro Instantâneo de Mês */}
+      <div className="quick-period-bar">
+        <div className="chip-group scrollable">
+          {[
+            { id: 'tudo', label: 'Tudo' },
+            { id: 'hoje', label: 'Hoje' },
+            { id: 'semana', label: 'Esta Semana' },
+            { id: 'mes', label: 'Este Mês' },
+            { id: 'selecionar_mes', label: 'Escolher Mês 📅' },
+            { id: 'ano', label: 'Este Ano' },
+          ].map(p => (
+            <button 
+              key={p.id}
+              className={`chip ${periodFilter === p.id ? 'active' : ''}`}
+              onClick={() => {
+                setPeriodFilter(p.id as any);
+                if (p.id === 'selecionar_mes' && !selectedMonth) {
+                  setSelectedMonth(new Date().toISOString().slice(0, 7));
+                }
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {periodFilter === 'selecionar_mes' && (
+          <motion.div 
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="quick-month-selector card glass"
+          >
+            <Calendar size={16} className="text-muted" />
+            <label>Filtrar Mês:</label>
+            <input 
+              type="month" 
+              value={selectedMonth} 
+              onChange={e => setSelectedMonth(e.target.value)} 
+            />
+          </motion.div>
         )}
       </div>
 
@@ -407,169 +582,246 @@ export default function Historico() {
         )}
       </AnimatePresence>
 
-      {/* Banner de Métricas Detalhadas de Faturamento e Rendimento Veicular */}
-      <section className="summary-banner card">
-        <div className="banner-top">
-          <div className="main-metric">
-            <span className="metric-label">Lucro Líquido Real</span>
-            <h2 className="metric-value positive">R$ {metrics.netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
-          </div>
-          <div className="main-metric align-right">
-            <span className="metric-label">Faturamento Bruto</span>
-            <h2 className="metric-value">R$ {metrics.grossEarnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
-          </div>
-        </div>
+      {/* Renderização Condicional de Acordo com a Aba Selecionada */}
+      {viewMode === 'rides' ? (
+        <>
+          {/* Banner de Métricas Detalhadas de Faturamento e Rendimento Veicular */}
+          <section className="summary-banner card">
+            <div className="banner-top">
+              <div className="main-metric">
+                <span className="metric-label">Lucro Líquido Real</span>
+                <h2 className="metric-value positive">R$ {metrics.netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+              </div>
+              <div className="main-metric align-right">
+                <span className="metric-label">Faturamento Bruto</span>
+                <h2 className="metric-value">R$ {metrics.grossEarnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+              </div>
+            </div>
 
-        <div className="banner-divider-h" />
+            <div className="banner-divider-h" />
 
-        <div className="metrics-grid">
-          <div className="grid-item">
-            <div className="item-icon-bg green">
-              <Navigation size={16} />
-            </div>
-            <div>
-              <p className="grid-label">Total Rodado</p>
-              <p className="grid-value">{metrics.totalKm.toLocaleString('pt-BR')} km</p>
-            </div>
-          </div>
-
-          <div className="grid-item">
-            <div className="item-icon-bg blue">
-              <Gauge size={16} />
-            </div>
-            <div>
-              <p className="grid-label">Rendimento Automóvel</p>
-              <p className="grid-value">{metrics.consumoReal.toFixed(1)} km/L</p>
-            </div>
-          </div>
-
-          <div className="grid-item">
-            <div className="item-icon-bg purple">
-              <TrendingUp size={16} />
-            </div>
-            <div>
-              <p className="grid-label">Lucro / KM</p>
-              <p className="grid-value">R$ {metrics.profitPerKm.toFixed(2)}/km</p>
-            </div>
-          </div>
-
-          <div className="grid-item">
-            <div className="item-icon-bg orange">
-              <Clock size={16} />
-            </div>
-            <div>
-              <p className="grid-label">Rendimento / Hora</p>
-              <p className="grid-value">R$ {metrics.profitPerHour.toFixed(2)}/h</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Lista do Histórico */}
-      <div className="history-list-header">
-        <span>Exibindo <strong>{filteredHistory.length}</strong> de {history.length} registros</span>
-      </div>
-
-      <div className="history-list">
-        <AnimatePresence mode="popLayout">
-          {loading ? (
-            <div className="loading-state">
-              <Loader2 className="animate-spin" />
-              <p>Carregando histórico...</p>
-            </div>
-          ) : filteredHistory.length === 0 ? (
-            <div className="empty-state card glass">
-              <Search size={32} className="text-muted" />
-              <p>Nenhum registro encontrado para os filtros selecionados.</p>
-              {hasActiveFilters && (
-                <button className="reset-btn mt" onClick={resetFilters}>
-                  Limpar Filtros
-                </button>
-              )}
-            </div>
-          ) : (
-            filteredHistory.map((item, index) => (
-              <motion.div 
-                key={item._id || index} 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: Math.min(index * 0.03, 0.3) }}
-                className={`history-item glass ${isDeleting === item._id ? 'deleting' : ''}`}
-              >
-                <div className="history-date">
-                  <div className="date-group">
-                    <Calendar size={14} className="text-muted" />
-                    <span>{new Date(item.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                  </div>
-                  <div className="actions">
-                    <button className="action-btn edit" onClick={() => setEditingItem(item)} title="Editar">
-                      <Pencil size={14} />
-                    </button>
-                    <button className="action-btn delete" onClick={() => handleDelete(item._id)} title="Excluir">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+            <div className="metrics-grid">
+              <div className="grid-item">
+                <div className="item-icon-bg green">
+                  <Navigation size={16} />
                 </div>
+                <div>
+                  <p className="grid-label">Total Rodado</p>
+                  <p className="grid-value">{metrics.totalKm.toLocaleString('pt-BR')} km</p>
+                </div>
+              </div>
 
-                {(() => {
-                  const itemKm = (item.kmEnd || 0) - item.kmStart;
-                  let rideFuelPrice = avgFuelPrice;
-                  const rideFuelCost = item.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.cost || 0), 0) || 0;
-                  const rideFuelLitres = item.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
-                  
-                  if (rideFuelLitres > 0) {
-                    rideFuelPrice = rideFuelCost / rideFuelLitres;
-                  }
-                  
-                  const fuelCostConsumed = (itemKm / globalConsumptionNum) * rideFuelPrice;
-                  const lucroReal = (item.earnings || 0) - fuelCostConsumed;
+              <div className="grid-item">
+                <div className="item-icon-bg blue">
+                  <Gauge size={16} />
+                </div>
+                <div>
+                  <p className="grid-label">Rendimento Automóvel</p>
+                  <p className="grid-value">{metrics.consumoReal.toFixed(1)} km/L</p>
+                </div>
+              </div>
 
-                  return (
-                    <div className="history-main">
-                      <div className="history-info">
-                        <div className={`platform-tag ${item.platform?.toLowerCase() === 'passeio' ? 'passeio' : 'aplicativos'}`}>
-                          {item.platform}
-                        </div>
-                        <p className="history-meta">
-                          {item.platform === 'Passeio' 
-                            ? `${itemKm.toFixed(1)} km percorridos`
-                            : `${item.rides} corridas • ${itemKm.toFixed(1)} km`
-                          }
-                          {item.startTime && item.endTime && (() => {
-                            const diffMs = new Date(item.endTime).getTime() - new Date(item.startTime).getTime();
-                            const diffMin = Math.round(diffMs / 60000);
-                            if (diffMin > 0) {
-                              const hours = Math.floor(diffMin / 60);
-                              const mins = diffMin % 60;
-                              return ` • ⏱️ ${hours > 0 ? `${hours}h ${mins}m` : `${mins}m`}`;
-                            }
-                            return null;
-                          })()}
-                          {item.fuelings?.length > 0 && ` • ${item.fuelings.length} Abast. (R$ ${rideFuelCost.toFixed(2)})`}
-                          {item.platform !== 'Passeio' && ` • Est. ${(itemKm / globalConsumptionNum).toFixed(1)}L`}
-                        </p>
+              <div className="grid-item">
+                <div className="item-icon-bg purple">
+                  <TrendingUp size={16} />
+                </div>
+                <div>
+                  <p className="grid-label">Lucro / KM</p>
+                  <p className="grid-value">R$ {metrics.profitPerKm.toFixed(2)}/km</p>
+                </div>
+              </div>
+
+              <div className="grid-item">
+                <div className="item-icon-bg orange">
+                  <Clock size={16} />
+                </div>
+                <div>
+                  <p className="grid-label">Rendimento / Hora</p>
+                  <p className="grid-value">R$ {metrics.profitPerHour.toFixed(2)}/h</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Lista do Histórico de Turnos */}
+          <div className="history-list-header">
+            <span>Exibindo <strong>{filteredHistory.length}</strong> de {history.length} turnos</span>
+          </div>
+
+          <div className="history-list">
+            <AnimatePresence mode="popLayout">
+              {loading ? (
+                <div className="loading-state">
+                  <Loader2 className="animate-spin" />
+                  <p>Carregando histórico...</p>
+                </div>
+              ) : filteredHistory.length === 0 ? (
+                <div className="empty-state card glass">
+                  <Search size={32} className="text-muted" />
+                  <p>Nenhum turno encontrado para os filtros selecionados.</p>
+                  {hasActiveFilters && (
+                    <button className="reset-btn mt" onClick={resetFilters}>
+                      Limpar Filtros
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredHistory.map((item, index) => (
+                  <motion.div 
+                    key={item._id || index} 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: Math.min(index * 0.03, 0.3) }}
+                    className={`history-item glass ${isDeleting === item._id ? 'deleting' : ''}`}
+                  >
+                    <div className="history-date">
+                      <div className="date-group">
+                        <Calendar size={14} className="text-muted" />
+                        <span>{new Date(item.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                       </div>
-                      <div className="history-earnings">
-                        <div className="earnings-group">
-                          <p className="earning-value">
-                            {item.platform === 'Passeio' ? 'Lazer' : `R$ ${item.earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                          </p>
-                          {item.platform !== 'Passeio' && (
-                            <p className={`profit-badge ${lucroReal >= 0 ? 'positive' : 'negative'}`}>
-                              Lucro: R$ {lucroReal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </p>
-                          )}
-                        </div>
+                      <div className="actions">
+                        <button className="action-btn edit" onClick={() => setEditingItem(item)} title="Editar">
+                          <Pencil size={14} />
+                        </button>
+                        <button className="action-btn delete" onClick={() => handleDelete(item._id)} title="Excluir">
+                          {isDeleting === item._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        </button>
                       </div>
                     </div>
-                  );
-                })()}
-              </motion.div>
-            ))
-          )}
-        </AnimatePresence>
-      </div>
+
+                    <div className="history-main mt-2">
+                      <div>
+                        <span className={`platform-tag ${item.platform?.toLowerCase()}`}>
+                          {item.platform || 'Aplicativos'}
+                        </span>
+                        <p className="history-meta">
+                          {(item.kmEnd || 0) - item.kmStart} km • {item.rides || 0} corridas
+                        </p>
+                      </div>
+                      <div className="earnings-group">
+                        <span className="earning-value">
+                          R$ {(item.earnings || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        {item.platform !== 'Passeio' && (
+                          <span className="profit-badge positive">
+                            Lucro: R$ {(((item.earnings || 0) - (((item.kmEnd || 0) - item.kmStart) / globalConsumptionNum) * avgFuelPrice)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Banner de Métricas de Gastos com Combustível */}
+          <section className="summary-banner fuel-banner card">
+            <div className="banner-top">
+              <div className="main-metric">
+                <span className="metric-label">Gasto Total com Combustível</span>
+                <h2 className="metric-value" style={{ color: '#38bdf8' }}>
+                  R$ {fuelMetrics.totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </h2>
+              </div>
+              <div className="main-metric align-right">
+                <span className="metric-label">Total de Litros</span>
+                <h2 className="metric-value">{fuelMetrics.totalLitres.toFixed(1)} L</h2>
+              </div>
+            </div>
+
+            <div className="banner-divider-h" />
+
+            <div className="metrics-grid">
+              <div className="grid-item">
+                <div className="item-icon-bg blue">
+                  <Fuel size={16} />
+                </div>
+                <div>
+                  <p className="grid-label">Preço Médio / Litro</p>
+                  <p className="grid-value">R$ {fuelMetrics.avgPricePerLitre.toFixed(2)}/L</p>
+                </div>
+              </div>
+
+              <div className="grid-item">
+                <div className="item-icon-bg orange">
+                  <Gauge size={16} />
+                </div>
+                <div>
+                  <p className="grid-label">Abastecimentos</p>
+                  <p className="grid-value">{fuelMetrics.count} registros</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Lista de Abastecimentos */}
+          <div className="history-list-header">
+            <span>Exibindo <strong>{filteredFuelings.length}</strong> abastecimentos</span>
+          </div>
+
+          <div className="history-list">
+            <AnimatePresence mode="popLayout">
+              {loading ? (
+                <div className="loading-state">
+                  <Loader2 className="animate-spin" />
+                  <p>Carregando abastecimentos...</p>
+                </div>
+              ) : filteredFuelings.length === 0 ? (
+                <div className="empty-state card glass">
+                  <Fuel size={32} className="text-muted" />
+                  <p>Nenhum abastecimento encontrado para os filtros selecionados.</p>
+                  {hasActiveFilters && (
+                    <button className="reset-btn mt" onClick={resetFilters}>
+                      Limpar Filtros
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredFuelings.map((fuel, index) => (
+                  <motion.div 
+                    key={fuel.id} 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: Math.min(index * 0.03, 0.3) }}
+                    className="history-item fuel-item glass"
+                  >
+                    <div className="history-date">
+                      <div className="date-group">
+                        <Calendar size={14} className="text-muted" />
+                        <span>{fuel.date.toLocaleDateString('pt-BR')} às {fuel.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <span className="platform-tag" style={{ background: '#0284c7', color: 'white' }}>
+                        Combustível
+                      </span>
+                    </div>
+
+                    <div className="history-main" style={{ marginTop: '10px' }}>
+                      <div className="history-meta">
+                        <p style={{ fontWeight: '700', fontSize: '0.95rem', color: '#0f172a' }}>
+                          {fuel.litres.toFixed(2)} Litros
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          Preço/L: R$ {fuel.pricePerLitre.toFixed(2)} {fuel.km ? `• KM no posto: ${fuel.km}` : ''}
+                        </p>
+                      </div>
+                      <div className="earnings-group">
+                        <span className="earning-value" style={{ fontSize: '1.15rem', color: '#0284c7', fontWeight: '800' }}>
+                          R$ {fuel.cost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+          </div>
+        </>
+      )}
 
       {/* Modal de Edição */}
       <AnimatePresence>
@@ -757,6 +1009,38 @@ export default function Historico() {
           padding-bottom: 40px;
         }
 
+        .view-mode-tabs {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 4px;
+          background: #f1f5f9;
+          padding: 4px;
+          border-radius: 14px;
+        }
+
+        .view-tab {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 10px;
+          border: none;
+          background: transparent;
+          border-radius: 10px;
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .view-tab.active {
+          background: white;
+          color: var(--primary);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
         .header {
           display: flex;
           justify-content: space-between;
@@ -896,6 +1180,56 @@ export default function Historico() {
           font-size: 0.85rem;
           font-weight: 600;
           color: var(--foreground);
+        }
+
+        .quick-period-bar {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+
+        .chip-group.scrollable {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding-bottom: 4px;
+          scrollbar-width: none;
+          white-space: nowrap;
+        }
+
+        .chip-group.scrollable::-webkit-scrollbar {
+          display: none;
+        }
+
+        .quick-month-selector {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: 12px;
+          background: white;
+          border: 1px solid var(--primary-glow);
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+          align-self: flex-start;
+        }
+
+        .quick-month-selector label {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--text-muted);
+        }
+
+        .quick-month-selector input[type="month"] {
+          border: 1px solid var(--card-border);
+          border-radius: 8px;
+          padding: 4px 8px;
+          font-size: 0.825rem;
+          font-weight: 700;
+          color: var(--foreground);
+          background: #f8fafc;
+          outline: none;
+          cursor: pointer;
         }
 
         .chip-group {
