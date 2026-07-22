@@ -621,27 +621,48 @@ export default function Dashboard() {
             {weeklyGanhos.map((ganho, i) => {
               const height = maxGanho > 0 ? (ganho / maxGanho) * 100 : 0;
               const hasEarnings = ganho > 0;
+              const ratio = maxGanho > 0 ? (ganho / maxGanho) : 0;
+              const isBestDay = hasEarnings && ganho === maxGanho;
+
+              let barClass = 'inactive';
+              if (isBestDay) {
+                barClass = 'best';
+              } else if (ratio >= 0.7) {
+                barClass = 'high';
+              } else if (ratio >= 0.4) {
+                barClass = 'medium';
+              } else if (hasEarnings) {
+                barClass = 'low';
+              }
+
               return (
                 <div key={i} className="bar-column">
-                  <div className="bar-value-label">
+                  <div className={`bar-value-label ${barClass}`}>
                     {hasEarnings ? `R$${Math.round(ganho)}` : ''}
                   </div>
                   <div className="bar-track">
                     <motion.div 
-                      className={`bar-fill ${hasEarnings ? 'active' : ''}`}
-                      style={{ height: `${Math.max(height, hasEarnings ? 8 : 4)}%` }}
+                      className={`bar-fill ${barClass}`}
+                      style={{ height: `${Math.max(height, hasEarnings ? 10 : 4)}%` }}
                       initial={{ height: 0 }}
-                      animate={{ height: `${Math.max(height, hasEarnings ? 8 : 4)}%` }}
+                      animate={{ height: `${Math.max(height, hasEarnings ? 10 : 4)}%` }}
                       transition={{ delay: 0.2 + (i * 0.05), duration: 0.6 }}
                       title={`${dayLabels[i]}: R$ ${ganho.toFixed(2)} (${weeklyRidesCount[i]} corridas • ${weeklyKmCount[i]} km)`}
                     />
                   </div>
-                  <div className="bar-day-label">
+                  <div className={`bar-day-label ${barClass}`}>
                     <span>{dayLabels[i]}</span>
                   </div>
                 </div>
               );
             })}
+          </div>
+
+          <div className="chart-legend">
+            <span className="legend-item"><span className="dot best" /> 🏆 Melhor Dia</span>
+            <span className="legend-item"><span className="dot high" /> Alto (≥70%)</span>
+            <span className="legend-item"><span className="dot medium" /> Médio (40-69%)</span>
+            <span className="legend-item"><span className="dot low" /> Baixo (&lt;40%)</span>
           </div>
         </div>
       </section>
@@ -1120,13 +1141,18 @@ export default function Dashboard() {
         .bar-value-label {
           font-size: 0.65rem;
           font-weight: 800;
-          color: var(--primary);
           height: 18px;
           display: flex;
           align-items: center;
           justify-content: center;
           white-space: nowrap;
+          color: var(--text-muted);
         }
+
+        .bar-value-label.best { color: #059669; }
+        .bar-value-label.high { color: #2563eb; }
+        .bar-value-label.medium { color: #7c3aed; }
+        .bar-value-label.low { color: #d97706; }
 
         .bar-track {
           flex: 1;
@@ -1146,9 +1172,28 @@ export default function Dashboard() {
           transition: all 0.3s ease;
         }
 
-        .bar-fill.active {
-          background: linear-gradient(to top, var(--primary), #6366f1);
+        .bar-fill.best {
+          background: linear-gradient(to top, #10b981, #34d399);
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+        }
+
+        .bar-fill.high {
+          background: linear-gradient(to top, #2563eb, #60a5fa);
           box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+        }
+
+        .bar-fill.medium {
+          background: linear-gradient(to top, #7c3aed, #c084fc);
+          box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);
+        }
+
+        .bar-fill.low {
+          background: linear-gradient(to top, #d97706, #fbbf24);
+          box-shadow: 0 4px 10px rgba(217, 119, 6, 0.25);
+        }
+
+        .bar-fill.inactive {
+          background: #e2e8f0;
         }
 
         .bar-day-label {
@@ -1157,6 +1202,37 @@ export default function Dashboard() {
           font-weight: 700;
           color: var(--text-muted);
         }
+
+        .bar-day-label.best { color: #059669; }
+        .bar-day-label.high { color: #1d4ed8; }
+
+        .chart-legend {
+          display: flex;
+          justify-content: center;
+          gap: 12px;
+          margin-top: 14px;
+          flex-wrap: wrap;
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          font-weight: 600;
+        }
+
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+
+        .dot.best { background: #10b981; }
+        .dot.high { background: #2563eb; }
+        .dot.medium { background: #7c3aed; }
+        .dot.low { background: #d97706; }
 
         .view-all {
           background: transparent;
