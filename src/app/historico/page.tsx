@@ -18,7 +18,40 @@ export default function Historico() {
   // Estados dos Filtros
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [periodFilter, setPeriodFilter] = useState<'tudo' | 'hoje' | 'semana' | 'mes' | 'selecionar_mes' | 'ano' | 'custom'>('tudo');
+  const getCurrentISOWeek = () => {
+    const d = new Date();
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+  };
+
+  const getDatesFromWeekString = (weekStr: string) => {
+    if (!weekStr || !weekStr.includes('-W')) return null;
+    const [yearStr, weekNumStr] = weekStr.split('-W');
+    const year = parseInt(yearStr, 10);
+    const weekNum = parseInt(weekNumStr, 10);
+
+    const jan4 = new Date(year, 0, 4);
+    const jan4Day = jan4.getDay() || 7;
+    const mondayWeek1 = new Date(jan4);
+    mondayWeek1.setDate(jan4.getDate() - jan4Day + 1);
+    mondayWeek1.setHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date(mondayWeek1);
+    startOfWeek.setDate(mondayWeek1.getDate() + (weekNum - 1) * 7);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return { startOfWeek, endOfWeek };
+  };
+
+  const [periodFilter, setPeriodFilter] = useState<'tudo' | 'hoje' | 'semana' | 'selecionar_semana' | 'mes' | 'selecionar_mes' | 'ano' | 'custom'>('tudo');
+  const [selectedWeek, setSelectedWeek] = useState(getCurrentISOWeek);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -162,6 +195,11 @@ export default function Historico() {
         sunday.setHours(23, 59, 59, 999);
 
         if (itemDate < monday || itemDate > sunday) return false;
+      } else if (periodFilter === 'selecionar_semana') {
+        const weekDates = getDatesFromWeekString(selectedWeek);
+        if (weekDates) {
+          if (itemDate < weekDates.startOfWeek || itemDate > weekDates.endOfWeek) return false;
+        }
       } else if (periodFilter === 'mes') {
         const isThisMonth = itemDate.getMonth() === now.getMonth() &&
           itemDate.getFullYear() === now.getFullYear();
@@ -319,6 +357,11 @@ export default function Historico() {
             sunday.setHours(23, 59, 59, 999);
 
             if (itemDate < monday || itemDate > sunday) return;
+          } else if (periodFilter === 'selecionar_semana') {
+            const weekDates = getDatesFromWeekString(selectedWeek);
+            if (weekDates) {
+              if (itemDate < weekDates.startOfWeek || itemDate > weekDates.endOfWeek) return;
+            }
           } else if (periodFilter === 'mes') {
             const isThisMonth = itemDate.getMonth() === now.getMonth() &&
               itemDate.getFullYear() === now.getFullYear();
@@ -454,6 +497,7 @@ export default function Historico() {
             { id: 'tudo', label: 'Tudo' },
             { id: 'hoje', label: 'Hoje' },
             { id: 'semana', label: 'Esta Semana' },
+            { id: 'selecionar_semana', label: 'Escolher Semana 🗓️' },
             { id: 'mes', label: 'Este Mês' },
             { id: 'selecionar_mes', label: 'Escolher Mês 📅' },
             { id: 'ano', label: 'Este Ano' },
@@ -472,6 +516,22 @@ export default function Historico() {
             </button>
           ))}
         </div>
+
+        {periodFilter === 'selecionar_semana' && (
+          <motion.div 
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="quick-month-selector card glass"
+          >
+            <Calendar size={16} className="text-muted" />
+            <label>Filtrar Semana:</label>
+            <input 
+              type="week" 
+              value={selectedWeek} 
+              onChange={e => setSelectedWeek(e.target.value)} 
+            />
+          </motion.div>
+        )}
 
         {periodFilter === 'selecionar_mes' && (
           <motion.div 
@@ -515,6 +575,7 @@ export default function Historico() {
                   { id: 'tudo', label: 'Tudo' },
                   { id: 'hoje', label: 'Hoje' },
                   { id: 'semana', label: '7 Dias' },
+                  { id: 'selecionar_semana', label: 'Escolher Semana 🗓️' },
                   { id: 'mes', label: 'Este Mês' },
                   { id: 'selecionar_mes', label: 'Escolher Mês 📅' },
                   { id: 'ano', label: 'Este Ano' },
@@ -530,6 +591,19 @@ export default function Historico() {
                 ))}
               </div>
             </div>
+
+            {periodFilter === 'selecionar_semana' && (
+              <div className="custom-dates">
+                <div className="date-input">
+                  <label>Semana Selecionada:</label>
+                  <input 
+                    type="week" 
+                    value={selectedWeek} 
+                    onChange={e => setSelectedWeek(e.target.value)} 
+                  />
+                </div>
+              </div>
+            )}
 
             {periodFilter === 'selecionar_mes' && (
               <div className="custom-dates">

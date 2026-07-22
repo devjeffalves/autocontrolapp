@@ -6,8 +6,61 @@ import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loa
 import Link from 'next/link';
 
 export default function Dashboard() {
-  const [period, setPeriod] = useState('Semana');
+  const getCurrentISOWeek = () => {
+    const d = new Date();
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+  };
+
+  const [selectedWeek, setSelectedWeek] = useState(getCurrentISOWeek);
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+
+  const getDatesFromWeekString = (weekStr: string) => {
+    if (!weekStr || !weekStr.includes('-W')) return null;
+    const [yearStr, weekNumStr] = weekStr.split('-W');
+    const year = parseInt(yearStr, 10);
+    const weekNum = parseInt(weekNumStr, 10);
+
+    const jan4 = new Date(year, 0, 4);
+    const jan4Day = jan4.getDay() || 7;
+    const mondayWeek1 = new Date(jan4);
+    mondayWeek1.setDate(jan4.getDate() - jan4Day + 1);
+    mondayWeek1.setHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date(mondayWeek1);
+    startOfWeek.setDate(mondayWeek1.getDate() + (weekNum - 1) * 7);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return { startOfWeek, endOfWeek };
+  };
+
+  const [period, setPeriod] = useState('Semana');
+
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    const weekDates = getDatesFromWeekString(selectedWeek);
+    if (!weekDates) return;
+    const refDate = new Date(weekDates.startOfWeek);
+    refDate.setDate(refDate.getDate() + (direction === 'next' ? 7 : -7));
+    
+    const date = new Date(Date.UTC(refDate.getFullYear(), refDate.getMonth(), refDate.getDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    const newWeekStr = `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+
+    setSelectedWeek(newWeekStr);
+    if (period !== 'Escolher Semana') {
+      setPeriod('Escolher Semana');
+    }
+  };
   const [rides, setRides] = useState<any[]>([]);
   const [vehicle, setVehicle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -225,6 +278,11 @@ export default function Dashboard() {
       sunday.setHours(23, 59, 59, 999);
 
       return rideDate >= monday && rideDate <= sunday;
+    } else if (period === 'Escolher Semana') {
+      const weekDates = getDatesFromWeekString(selectedWeek);
+      if (weekDates) {
+        return rideDate >= weekDates.startOfWeek && rideDate <= weekDates.endOfWeek;
+      }
     } else if (period === 'Mês') {
       return rideDate.getMonth() === now.getMonth() && rideDate.getFullYear() === now.getFullYear();
     } else if (period === 'Escolher Mês') {
@@ -259,28 +317,31 @@ export default function Dashboard() {
       totalLitresForAvg += (f.litres || 0);
     });
   });
-  const avgFuelPrice = totalLitresForAvg > 0 ? (totalFuelCostForAvg / totalLitresForAvg) : 5.50;
 
-  // Cálculo de rendimento real (km/L) - soma todos os abastecimentos
-  const totalLitres = filteredRides.reduce((acc, curr) => {
-    const rideLitres = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
-    return acc + rideLitres;
-  }, 0);
+  const avgFuelPrice = totalLitresForAvg > 0 ? (totalFuelCostForAvg / totalLitresForAvg) : 5.89;
 
-  // Consumo acumulado real do período: KM total do período / Litros totais abastecidos
-  const calculatedAvgConsumption = totalLitres > 0 ? (totalKm / totalLitres) : 0;
-  
-  // Consumo é consistente se estiver em uma faixa física realista (ex: entre 6 e 22 km/L)
-  const isConsumptionInconsistent = totalLitres > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
-  
-  // Para cálculos financeiros, se estiver inconsistente, usamos fallback da média cadastrada do veículo
-  const realAvgConsumptionNum = (totalLitres > 0 && !isConsumptionInconsistent)
-    ? calculatedAvgConsumption
+  // Cálculo do Consumo Médio (km/L)
+  let totalKmForCons = 0;
+  let totalLitresForCons = 0;
+
+  filteredRides.forEach(ride => {
+    const rideLitres = ride.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
+    if (rideLitres > 0) {
+      totalLitresForCons += rideLitres;
+      totalKmForCons += (ride.kmTotal || 0);
+    }
+  });
+
+  const calculatedAvgConsumption = totalLitresForCons > 0 ? (totalKmForCons / totalLitresForCons) : (vehicle?.avgConsumption || 14.5);
+  const isConsumptionInconsistent = totalLitresForCons > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
+
+  const realAvgConsumptionNum = (totalLitresForCons > 0 && !isConsumptionInconsistent) 
+    ? calculatedAvgConsumption 
     : (vehicle?.avgConsumption || 14.5);
     
   // Exibimos a média calculada para que o usuário veja a discrepância se houver litros, 
   // ou a média do veículo se não houver registros de litros.
-  const displayAvgConsumptionNum = totalLitres > 0 ? calculatedAvgConsumption : (vehicle?.avgConsumption || 14.5);
+  const displayAvgConsumptionNum = totalLitresForCons > 0 ? calculatedAvgConsumption : (vehicle?.avgConsumption || 14.5);
   const realAvgConsumption = displayAvgConsumptionNum.toFixed(1);
 
   // Consumo acumulado real GLOBAL (de todo o histórico de viagens)
@@ -339,24 +400,44 @@ export default function Dashboard() {
     // Se houver corridas no período filtrado, usamos esse contexto para o gráfico
     const ridesForChart = filteredRides.length > 0 ? filteredRides : closedRides;
 
-    // Se estiver no filtro 'Escolher Mês', usamos a referência do mês selecionado
-    let referenceDate = now;
-    if (period === 'Escolher Mês' && selectedMonth) {
-      const [y, m] = selectedMonth.split('-');
-      referenceDate = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 15);
-    } else if (ridesForChart.length > 0) {
-      referenceDate = new Date(ridesForChart[0].date);
+    let startOfWeek: Date;
+    let endOfWeek: Date;
+
+    if (period === 'Escolher Semana') {
+      const weekDates = getDatesFromWeekString(selectedWeek);
+      if (weekDates) {
+        startOfWeek = weekDates.startOfWeek;
+        endOfWeek = weekDates.endOfWeek;
+      } else {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        startOfWeek = new Date(now);
+        startOfWeek.setDate(diff);
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23, 59, 59, 999);
+      }
+    } else {
+      let referenceDate = now;
+      if (period === 'Escolher Mês' && selectedMonth) {
+        const [y, m] = selectedMonth.split('-');
+        referenceDate = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 15);
+      } else if (ridesForChart.length > 0) {
+        referenceDate = new Date(ridesForChart[0].date);
+      }
+
+      startOfWeek = new Date(referenceDate);
+      const day = referenceDate.getDay();
+      const diff = referenceDate.getDate() - day + (day === 0 ? -6 : 1);
+      startOfWeek.setDate(diff);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
     }
-
-    const startOfWeek = new Date(referenceDate);
-    const day = referenceDate.getDay();
-    const diff = referenceDate.getDate() - day + (day === 0 ? -6 : 1);
-    startOfWeek.setDate(diff);
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
 
     const weeklyGanhos = [0, 0, 0, 0, 0, 0, 0]; // Seg a Dom
     const weeklyRidesCount = [0, 0, 0, 0, 0, 0, 0];
@@ -492,7 +573,8 @@ export default function Dashboard() {
           <div className="period-selector glass">
             {[
               { id: 'Dia', label: 'Dia' },
-              { id: 'Semana', label: 'Semana' },
+              { id: 'Semana', label: 'Esta Semana' },
+              { id: 'Escolher Semana', label: 'Escolher Semana 🗓️' },
               { id: 'Mês', label: 'Este Mês' },
               { id: 'Escolher Mês', label: 'Escolher Mês 📅' },
               { id: 'Ano', label: 'Ano' },
@@ -507,6 +589,20 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
+          {period === 'Escolher Semana' && (
+            <motion.div 
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="month-picker-wrapper glass"
+            >
+              <label>Selecione a Semana:</label>
+              <input 
+                type="week" 
+                value={selectedWeek} 
+                onChange={e => setSelectedWeek(e.target.value)} 
+              />
+            </motion.div>
+          )}
           {period === 'Escolher Mês' && (
             <motion.div 
               initial={{ opacity: 0, y: -4 }}
@@ -539,7 +635,7 @@ export default function Dashboard() {
           </div>
           <div className="alert-actions">
             <button onClick={() => handleCancelSession(activeSession._id)} className="btn-cancel">Cancelar</button>
-            <Link href="/novo" className="btn-alert">Continuar</Link>
+            <Link href="/novo" className="btn-continue">Continuar</Link>
           </div>
         </motion.div>
       )}
@@ -569,13 +665,13 @@ export default function Dashboard() {
       )}
 
       <section className="stats-grid">
-        {stats.map((stat, index) => (
+        {stats.map((stat, i) => (
           <motion.div 
-            key={stat.label}
-            className="stat-card card"
+            key={i} 
+            className="stat-card card glass"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
+            transition={{ delay: i * 0.05 }}
           >
             <div className="stat-header">
               <div className="stat-icon" style={{ backgroundColor: stat.color + '20', color: stat.color }}>
@@ -597,7 +693,13 @@ export default function Dashboard() {
       <section className="chart-section card">
         <div className="section-header" style={{ marginBottom: '8px' }}>
           <div>
-            <h3 className="section-title">Desempenho Semanal</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 className="section-title">Desempenho Semanal</h3>
+              <div className="week-nav-btns">
+                <button className="week-nav-btn" onClick={() => navigateWeek('prev')} title="Semana Anterior">◄</button>
+                <button className="week-nav-btn" onClick={() => navigateWeek('next')} title="Próxima Semana">►</button>
+              </div>
+            </div>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>
               Semana: {periodRangeStr}
             </p>
@@ -625,14 +727,20 @@ export default function Dashboard() {
               const isBestDay = hasEarnings && ganho === maxGanho;
 
               let barClass = 'inactive';
+              let barBg = '#e2e8f0';
+
               if (isBestDay) {
                 barClass = 'best';
+                barBg = 'linear-gradient(to top, #10b981, #34d399)';
               } else if (ratio >= 0.7) {
                 barClass = 'high';
+                barBg = 'linear-gradient(to top, #2563eb, #60a5fa)';
               } else if (ratio >= 0.4) {
                 barClass = 'medium';
+                barBg = 'linear-gradient(to top, #7c3aed, #c084fc)';
               } else if (hasEarnings) {
                 barClass = 'low';
+                barBg = 'linear-gradient(to top, #d97706, #fbbf24)';
               }
 
               return (
@@ -641,12 +749,15 @@ export default function Dashboard() {
                     {hasEarnings ? `R$${Math.round(ganho)}` : ''}
                   </div>
                   <div className="bar-track">
-                    <motion.div 
+                    <div 
                       className={`bar-fill ${barClass}`}
-                      style={{ height: `${Math.max(height, hasEarnings ? 10 : 4)}%` }}
-                      initial={{ height: 0 }}
-                      animate={{ height: `${Math.max(height, hasEarnings ? 10 : 4)}%` }}
-                      transition={{ delay: 0.2 + (i * 0.05), duration: 0.6 }}
+                      style={{ 
+                        height: `${hasEarnings ? Math.max(height, 12) : 0}%`,
+                        background: barBg,
+                        width: '100%',
+                        borderRadius: '8px',
+                        transition: 'height 0.8s ease-in-out'
+                      }}
                       title={`${dayLabels[i]}: R$ ${ganho.toFixed(2)} (${weeklyRidesCount[i]} corridas • ${weeklyKmCount[i]} km)`}
                     />
                   </div>
@@ -1109,6 +1220,28 @@ export default function Dashboard() {
           font-weight: 600;
         }
 
+        .week-nav-btns {
+          display: flex;
+          gap: 4px;
+        }
+
+        .week-nav-btn {
+          border: 1px solid var(--card-border);
+          background: #f8fafc;
+          border-radius: 6px;
+          padding: 2px 8px;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--primary);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .week-nav-btn:hover {
+          background: var(--primary);
+          color: white;
+        }
+
         .weekly-sub-info {
           font-size: 0.75rem;
           color: var(--text-muted);
@@ -1155,45 +1288,42 @@ export default function Dashboard() {
         .bar-value-label.low { color: #d97706; }
 
         .bar-track {
-          flex: 1;
           width: 100%;
-          max-width: 28px;
+          max-width: 32px;
+          height: 100px;
           background: #f1f5f9;
-          border-radius: 8px;
+          border-radius: 10px;
           display: flex;
           align-items: flex-end;
           overflow: hidden;
+          padding: 2px;
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
         }
 
         .bar-fill {
           width: 100%;
-          background: #cbd5e1;
           border-radius: 8px;
-          transition: all 0.3s ease;
+          transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .bar-fill.best {
-          background: linear-gradient(to top, #10b981, #34d399);
-          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
         }
 
         .bar-fill.high {
-          background: linear-gradient(to top, #2563eb, #60a5fa);
-          box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+          box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
         }
 
         .bar-fill.medium {
-          background: linear-gradient(to top, #7c3aed, #c084fc);
-          box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);
+          box-shadow: 0 4px 10px rgba(124, 58, 237, 0.3);
         }
 
         .bar-fill.low {
-          background: linear-gradient(to top, #d97706, #fbbf24);
-          box-shadow: 0 4px 10px rgba(217, 119, 6, 0.25);
+          box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3);
         }
 
         .bar-fill.inactive {
-          background: #e2e8f0;
+          background: transparent;
         }
 
         .bar-day-label {
