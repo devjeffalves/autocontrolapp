@@ -19,32 +19,46 @@ export async function POST(request: NextRequest) {
 
     await dbConnect();
     
-    // Buscar contexto do usuário
+    // Buscar todos os registros fechados para contexto completo sem limitar apenas aos 10 últimos
     const [rides, vehicle] = await Promise.all([
-      Ride.find({ status: 'closed' }).sort({ date: -1 }).limit(10),
+      Ride.find({ status: 'closed' }).sort({ date: -1 }),
       Vehicle.findOne({})
     ]);
 
-    let totalCost = 0;
-    let totalLitres = 0;
-    let totalKmRides = 0;
+    let globalCost = 0;
+    let globalLitres = 0;
+    let globalKm = 0;
     rides.forEach(r => {
-      totalKmRides += (r.kmTotal || 0);
+      globalKm += (r.kmTotal || 0);
       r.fuelings?.forEach((f: any) => {
-        totalCost += (f.cost || 0);
-        totalLitres += (f.litres || 0);
+        globalCost += (f.cost || 0);
+        globalLitres += (f.litres || 0);
       });
     });
-    const avgFuelPrice = totalLitres > 0 ? (totalCost / totalLitres) : 5.50;
 
-    const calculatedAvgConsumption = totalLitres > 0 ? (totalKmRides / totalLitres) : 0;
-    const isConsumptionInconsistent = totalLitres > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
+    const avgFuelPrice = globalLitres > 0 ? (globalCost / globalLitres) : 5.50;
+    const calculatedAvgConsumption = globalLitres > 0 ? (globalKm / globalLitres) : 0;
+    const isConsumptionInconsistent = globalLitres > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
 
-    const vehicleAvgConsumption = (totalLitres > 0 && !isConsumptionInconsistent)
+    const vehicleAvgConsumption = (globalLitres > 0 && !isConsumptionInconsistent)
       ? calculatedAvgConsumption
       : (vehicle?.avgConsumption || 14.5);
 
-    const statsContext = rides.map(r => {
+    // Agrupar estatísticas consolidadas por mês (Maio, Junho, Julho, etc.)
+    const monthlySummary: Record<string, {
+      mes: string;
+      faturamento: number;
+      lucroLiquido: number;
+      kmTotal: number;
+      corridas: number;
+      horasTrabalhadas: number;
+      combustivelGasto: number;
+      rendimentoKmL: number;
+      lucroPorKm: number;
+      lucroPorHora: number;
+    }> = {};
+
+    const detailedRides = rides.map(r => {
       const kmTotal = r.kmTotal || 0;
       let rideFuelPrice = avgFuelPrice;
       const rideFuelCost = r.fuelings?.reduce((acc: number, f: any) => acc + (f.cost || 0), 0) || 0;
@@ -54,12 +68,20 @@ export async function POST(request: NextRequest) {
       }
       
       const fuelCostConsumed = (kmTotal / vehicleAvgConsumption) * rideFuelPrice;
-      const lucro = (r.earnings || 0) - fuelCostConsumed;
+      const lucro = (r.platform === 'Passeio') ? 0 : ((r.earnings || 0) - fuelCostConsumed);
 
+      let diffHours = 0;
       let rideDurationStr = "Não informada";
       if (r.startTime && r.endTime) {
-        const diffMs = new Date(r.endTime).getTime() - new Date(r.startTime).getTime();
-        const diffMin = Math.round(diffMs / 60000);
+        const totalDiffMs = new Date(r.endTime).getTime() - new Date(r.startTime).getTime();
+        const totalPauseMs = (r.pauses || []).reduce((acc: number, p: any) => {
+          const pStart = new Date(p.startTime).getTime();
+          const pEnd = p.endTime ? new Date(p.endTime).getTime() : pStart;
+          return acc + Math.max(0, pEnd - pStart);
+        }, 0);
+        const workingMs = Math.max(0, totalDiffMs - totalPauseMs);
+        diffHours = workingMs / (1000 * 60 * 60);
+        const diffMin = Math.round(workingMs / 60000);
         if (diffMin > 0) {
           const hours = Math.floor(diffMin / 60);
           const mins = diffMin % 60;
@@ -67,9 +89,40 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Agrupamento mensal
+      const d = new Date(r.date || r.createdAt);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      const monthLabel = `${monthNames[d.getMonth()]} de ${d.getFullYear()}`;
+
+      if (!monthlySummary[monthKey]) {
+        monthlySummary[monthKey] = {
+          mes: monthLabel,
+          faturamento: 0,
+          lucroLiquido: 0,
+          kmTotal: 0,
+          corridas: 0,
+          horasTrabalhadas: 0,
+          combustivelGasto: 0,
+          rendimentoKmL: 0,
+          lucroPorKm: 0,
+          lucroPorHora: 0
+        };
+      }
+
+      if (r.platform !== 'Passeio') {
+        monthlySummary[monthKey].faturamento += (r.earnings || 0);
+        monthlySummary[monthKey].lucroLiquido += lucro;
+        monthlySummary[monthKey].corridas += (r.rides || 0);
+      }
+      monthlySummary[monthKey].kmTotal += kmTotal;
+      monthlySummary[monthKey].horasTrabalhadas += diffHours;
+      monthlySummary[monthKey].combustivelGasto += fuelCostConsumed;
+
       return {
-        data: r.date.toLocaleDateString('pt-BR'),
-        ganhos: r.earnings,
+        data: d.toLocaleDateString('pt-BR'),
+        mes: monthLabel,
+        ganhos: r.earnings || 0,
         km: kmTotal,
         lucro: Number(lucro.toFixed(2)),
         plataforma: r.platform,
@@ -77,25 +130,41 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // Formatando valores nos resumos mensais
+    Object.values(monthlySummary).forEach(m => {
+      m.faturamento = Number(m.faturamento.toFixed(2));
+      m.lucroLiquido = Number(m.lucroLiquido.toFixed(2));
+      m.combustivelGasto = Number(m.combustivelGasto.toFixed(2));
+      m.kmTotal = Number(m.kmTotal.toFixed(1));
+      m.horasTrabalhadas = Number(m.horasTrabalhadas.toFixed(1));
+      m.rendimentoKmL = Number(vehicleAvgConsumption.toFixed(1));
+      m.lucroPorKm = m.kmTotal > 0 ? Number((m.lucroLiquido / m.kmTotal).toFixed(2)) : 0;
+      m.lucroPorHora = m.horasTrabalhadas > 0 ? Number((m.lucroLiquido / m.horasTrabalhadas).toFixed(2)) : 0;
+    });
+
     const systemPrompt = `
-      Você é a "Assistente de Bordo" da Auto Control, uma parceira amigável e encorajadora para motoristas de aplicativo.
-      Seu objetivo é ajudar o motorista a lucrar mais com dicas práticas e motivadoras.
-      
+      Você é a "Assistente de Bordo" da Auto Control, uma parceira inteligente e encorajadora para motoristas de aplicativo.
+      Seu objetivo é analisar o desempenho financeiro e operacional do motorista e responder com precisão a qualquer pergunta sobre seus registros de faturamento, lucro, corridas, km e rendimento (incluindo Maio, Junho, Julho e qualquer outro mês cadastrado).
+
       TONALIDADE:
-      - Seja calorosa, profissional e direta.
-      - Use uma linguagem de parceria (ex: "Vamos lá!", "Bora faturar!", "Olha só essa dica").
-      - Evite listas muito longas ou símbolos complexos.
-      
-      CONTEXTO DO MOTORISTA:
-      - Veículo: ${vehicle?.model || 'Não cadastrado'}
-      - Consumo Médio Esperado: ${vehicle?.avgConsumption || 0} km/L
-      - Últimos 10 Registros (inclui ganhos, km, lucro real e duração de cada turno de trabalho): ${JSON.stringify(statsContext)}
-      
+      - Seja calorosa, parceira, profissional e direta.
+      - Sempre formate valores monetários no padrão de moeda brasileiro (R$ XX,XX).
+      - Responda sempre em Português do Brasil.
+
+      INFORMAÇÕES DO VEÍCULO:
+      - Modelo: ${vehicle?.model || 'Não cadastrado'}
+      - Consumo Médio Calculado/Real: ${vehicleAvgConsumption.toFixed(1)} km/L
+
+      RESUMO CONSOLIDADO POR MÊS DE TODO O HISTÓRICO DO MOTORISTA:
+      ${JSON.stringify(Object.values(monthlySummary), null, 2)}
+
+      REGISTROS DETALHADOS DAS CORRIDAS DO MOTORISTA:
+      ${JSON.stringify(detailedRides.slice(0, 60), null, 2)}
+
       DIRETRIZES:
-      1. Baseie seus conselhos nos dados reais fornecidos.
-      2. Foque em como aumentar o lucro por KM de forma leve.
-      3. Sempre formate valores monetários no padrão de moeda brasileiro (R$ XX,XX) usando a vírgula como separador decimal.
-      4. Sempre responda em Português do Brasil.
+      1. Use os dados consolidados do resumo mensal para responder sobre qualquer mês específico (ex: Maio, Junho, etc.) ou fazer comparações entre meses.
+      2. Se o motorista perguntar sobre o desempenho de um mês em específico, informe os valores exatos de faturamento, lucro líquido, km e rendimento daquele mês.
+      3. Sempre motive o motorista com dicas práticas baseadas no seu rendimento (R$/km e R$/h).
     `;
 
     const chatCompletion = await groq.chat.completions.create({
@@ -107,7 +176,7 @@ export async function POST(request: NextRequest) {
         })),
         { role: 'user', content: message }
       ],
-      model: 'llama-3.1-8b-instant',
+      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
     });
 
     const text = chatCompletion.choices[0]?.message?.content || "";
