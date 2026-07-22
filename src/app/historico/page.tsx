@@ -18,7 +18,8 @@ export default function Historico() {
   // Estados dos Filtros
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [periodFilter, setPeriodFilter] = useState<'tudo' | 'hoje' | 'semana' | 'mes' | 'ano' | 'custom'>('tudo');
+  const [periodFilter, setPeriodFilter] = useState<'tudo' | 'hoje' | 'semana' | 'mes' | 'selecionar_mes' | 'ano' | 'custom'>('tudo');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [platformFilter, setPlatformFilter] = useState<'todos' | 'Aplicativos' | 'Passeio'>('todos');
@@ -98,6 +99,7 @@ export default function Historico() {
     setPeriodFilter('tudo');
     setStartDate('');
     setEndDate('');
+    setSelectedMonth(new Date().toISOString().slice(0, 7));
     setPlatformFilter('todos');
     setSortBy('recentes');
   };
@@ -154,6 +156,14 @@ export default function Historico() {
         const isThisMonth = itemDate.getMonth() === now.getMonth() &&
           itemDate.getFullYear() === now.getFullYear();
         if (!isThisMonth) return false;
+      } else if (periodFilter === 'selecionar_mes') {
+        if (selectedMonth) {
+          const [yearStr, monthStr] = selectedMonth.split('-');
+          const year = parseInt(yearStr, 10);
+          const month = parseInt(monthStr, 10) - 1;
+          const isSelectedMonth = itemDate.getFullYear() === year && itemDate.getMonth() === month;
+          if (!isSelectedMonth) return false;
+        }
       } else if (periodFilter === 'ano') {
         if (itemDate.getFullYear() !== now.getFullYear()) return false;
       } else if (periodFilter === 'custom') {
@@ -322,6 +332,7 @@ export default function Historico() {
                   { id: 'hoje', label: 'Hoje' },
                   { id: 'semana', label: '7 Dias' },
                   { id: 'mes', label: 'Este Mês' },
+                  { id: 'selecionar_mes', label: 'Escolher Mês 📅' },
                   { id: 'ano', label: 'Este Ano' },
                   { id: 'custom', label: 'Personalizado' },
                 ].map(p => (
@@ -335,6 +346,19 @@ export default function Historico() {
                 ))}
               </div>
             </div>
+
+            {periodFilter === 'selecionar_mes' && (
+              <div className="custom-dates">
+                <div className="date-input">
+                  <label>Mês Selecionado:</label>
+                  <input 
+                    type="month" 
+                    value={selectedMonth} 
+                    onChange={e => setSelectedMonth(e.target.value)} 
+                  />
+                </div>
+              </div>
+            )}
 
             {periodFilter === 'custom' && (
               <div className="custom-dates">
