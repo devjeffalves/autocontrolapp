@@ -99,8 +99,24 @@ export default function Veiculo() {
         }
 
         if (lastFueling && vData.data) {
+          let currentVehicleKm = vData.data.currentKm || 0;
+          if (allRides && allRides.length > 0) {
+            const sortedRides = [...allRides].sort((a, b) => {
+              const timeA = new Date(a.endTime || a.startTime || a.date).getTime();
+              const timeB = new Date(b.endTime || b.startTime || b.date).getTime();
+              return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+            });
+            const latestRide = sortedRides[0];
+            if (latestRide) {
+              const latestKm = latestRide.kmEnd || latestRide.kmStart;
+              if (latestKm && latestKm > 0) {
+                currentVehicleKm = latestKm;
+              }
+            }
+          }
+
           const nextFuelingKm = lastFueling.km + (lastFueling.litres * computedAvg);
-          const kmRemaining = nextFuelingKm - vData.data.currentKm;
+          const kmRemaining = nextFuelingKm - currentVehicleKm;
           
           let status: 'ok' | 'warning' | 'urgent' = 'ok';
           if (kmRemaining <= 0) {

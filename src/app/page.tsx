@@ -529,8 +529,25 @@ export default function Dashboard() {
 
   let projection: { nextFuelingKm: number; kmRemaining: number; status: 'ok' | 'warning' | 'urgent' } | null = null;
   if (lastFueling && vehicle) {
+    // Resolve o KM atual do veículo considerando o turno mais recente para evitar discrepâncias do banco
+    let currentVehicleKm = vehicle.currentKm || 0;
+    if (rides && rides.length > 0) {
+      const sortedRides = [...rides].sort((a, b) => {
+        const timeA = new Date(a.endTime || a.startTime || a.date).getTime();
+        const timeB = new Date(b.endTime || b.startTime || b.date).getTime();
+        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+      });
+      const latestRide = sortedRides[0];
+      if (latestRide) {
+        const latestKm = latestRide.kmEnd || latestRide.kmStart;
+        if (latestKm && latestKm > 0) {
+          currentVehicleKm = latestKm;
+        }
+      }
+    }
+
     const nextFuelingKm = lastFueling.km + (lastFueling.litres * realAvgConsumptionNum);
-    const kmRemaining = nextFuelingKm - vehicle.currentKm;
+    const kmRemaining = nextFuelingKm - currentVehicleKm;
     
     let status: 'ok' | 'warning' | 'urgent' = 'ok';
     if (kmRemaining <= 0) {
