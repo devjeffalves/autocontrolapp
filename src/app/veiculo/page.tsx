@@ -61,9 +61,9 @@ export default function Veiculo() {
           }
         }
 
-        // Achar o abastecimento mais recente considerando KM efetivo
+        // Achar o abastecimento mais recente considerando o MAIOR KM (odômetro mais avançado)
         let lastFueling: { km: number; litres: number; date: Date } | null = null;
-        const extractedFuelings: Array<{ km: number; litres: number; date: Date }> = [];
+        const extractedFuelings: Array<{ km: number; litres: number; date: Date; timestamp: number }> = [];
 
         for (const ride of allRides) {
           if (ride.fuelings && ride.fuelings.length > 0) {
@@ -72,21 +72,29 @@ export default function Veiculo() {
                 const effectiveKm = (f.km && f.km > 0) 
                   ? f.km 
                   : (ride.kmEnd || ride.kmStart || (vData.data?.currentKm || 0));
-                const effectiveDate = f.date ? new Date(f.date) : (ride.endTime ? new Date(ride.endTime) : new Date(ride.date));
-                if (effectiveKm > 0) {
-                  extractedFuelings.push({
-                    km: effectiveKm,
-                    litres: f.litres,
-                    date: effectiveDate
-                  });
-                }
+                
+                const rawDate = f.date || ride.endTime || ride.date;
+                const parsedTime = rawDate ? new Date(rawDate).getTime() : 0;
+                const timestamp = isNaN(parsedTime) ? 0 : parsedTime;
+
+                extractedFuelings.push({
+                  km: effectiveKm,
+                  litres: f.litres,
+                  date: new Date(timestamp),
+                  timestamp
+                });
               }
             }
           }
         }
 
         if (extractedFuelings.length > 0) {
-          extractedFuelings.sort((a, b) => b.date.getTime() - a.date.getTime());
+          extractedFuelings.sort((a, b) => {
+            if (b.km !== a.km) {
+              return b.km - a.km;
+            }
+            return b.timestamp - a.timestamp;
+          });
           lastFueling = extractedFuelings[0];
         }
 
