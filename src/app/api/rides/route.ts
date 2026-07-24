@@ -129,19 +129,20 @@ export async function POST(request: NextRequest) {
 
     // 5. Adicionar Abastecimento ao turno
     if (body.action === 'add_fueling') {
-      const fuelKmNum = body.fuelKm ? Number(body.fuelKm) : undefined;
+      const vehicle = await Vehicle.findOne();
+      const fuelKmNum = body.fuelKm ? Number(body.fuelKm) : (activeSession.kmEnd || activeSession.kmStart || vehicle?.currentKm || 0);
       const fuelingDate = body.date ? parseDateInput(body.date) : new Date();
 
       activeSession.fuelings.push({
         cost: Number(body.fuelCost),
         litres: Number(body.fuelLitres),
-        km: fuelKmNum,
+        km: fuelKmNum > 0 ? fuelKmNum : undefined,
         date: fuelingDate
       });
       await activeSession.save();
 
       // Atualizar o KM do veículo se o KM informado for maior
-      if (fuelKmNum) {
+      if (fuelKmNum > 0) {
         await Vehicle.findOneAndUpdate(
           { currentKm: { $lt: fuelKmNum } },
           { currentKm: fuelKmNum, lastUpdated: new Date() }

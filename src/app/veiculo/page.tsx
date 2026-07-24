@@ -60,17 +60,33 @@ export default function Veiculo() {
             }
           }
 
-          // Achar o abastecimento mais recente com km gravado
-          let lastFueling: any = null;
+          // Achar o abastecimento mais recente considerando KM efetivo
+          let lastFueling: { km: number; litres: number; date: Date } | null = null;
+          const extractedFuelings: Array<{ km: number; litres: number; date: Date }> = [];
+
           for (const ride of allRides) {
             if (ride.fuelings && ride.fuelings.length > 0) {
-              const sortedFuelings = [...ride.fuelings].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-              const found = sortedFuelings.find((f: any) => f.km && f.km > 0 && f.litres > 0);
-              if (found) {
-                lastFueling = found;
-                break;
+              for (const f of ride.fuelings) {
+                if (f.litres && f.litres > 0) {
+                  const effectiveKm = (f.km && f.km > 0) 
+                    ? f.km 
+                    : (ride.kmEnd || ride.kmStart || (vData.data?.currentKm || 0));
+                  const effectiveDate = f.date ? new Date(f.date) : (ride.endTime ? new Date(ride.endTime) : new Date(ride.date));
+                  if (effectiveKm > 0) {
+                    extractedFuelings.push({
+                      km: effectiveKm,
+                      litres: f.litres,
+                      date: effectiveDate
+                    });
+                  }
+                }
               }
             }
+          }
+
+          if (extractedFuelings.length > 0) {
+            extractedFuelings.sort((a, b) => b.date.getTime() - a.date.getTime());
+            lastFueling = extractedFuelings[0];
           }
 
           if (lastFueling && vData.data) {

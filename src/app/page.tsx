@@ -487,17 +487,32 @@ export default function Dashboard() {
   } = getWeeklyPerformance();
 
   // Lógica de Projeção do Próximo Abastecimento
-  let lastFueling: any = null;
-  const allRides = rides;
-  for (const ride of allRides) {
+  let lastFueling: { km: number; litres: number; date: Date } | null = null;
+  const extractedFuelings: Array<{ km: number; litres: number; date: Date }> = [];
+
+  for (const ride of rides) {
     if (ride.fuelings && ride.fuelings.length > 0) {
-      const sortedFuelings = [...ride.fuelings].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const found = sortedFuelings.find((f: any) => f.km && f.km > 0 && f.litres > 0);
-      if (found) {
-        lastFueling = found;
-        break;
+      for (const f of ride.fuelings) {
+        if (f.litres && f.litres > 0) {
+          const effectiveKm = (f.km && f.km > 0) 
+            ? f.km 
+            : (ride.kmEnd || ride.kmStart || (vehicle?.currentKm || 0));
+          const effectiveDate = f.date ? new Date(f.date) : (ride.endTime ? new Date(ride.endTime) : new Date(ride.date));
+          if (effectiveKm > 0) {
+            extractedFuelings.push({
+              km: effectiveKm,
+              litres: f.litres,
+              date: effectiveDate
+            });
+          }
+        }
       }
     }
+  }
+
+  if (extractedFuelings.length > 0) {
+    extractedFuelings.sort((a, b) => b.date.getTime() - a.date.getTime());
+    lastFueling = extractedFuelings[0];
   }
 
   let projection: { nextFuelingKm: number; kmRemaining: number; status: 'ok' | 'warning' | 'urgent' } | null = null;
@@ -1019,7 +1034,7 @@ export default function Dashboard() {
                           if (costEl && litresEl) {
                             const cost = parseFloat(costEl.value);
                             const litres = parseFloat(litresEl.value);
-                            const km = kmEl.value ? parseInt(kmEl.value) : undefined;
+                            const km = kmEl.value ? parseInt(kmEl.value) : (editingItem.kmEnd || editingItem.kmStart || vehicle?.currentKm);
                             
                             if (cost > 0 && litres > 0) {
                               const newF = {
@@ -1645,6 +1660,9 @@ export default function Dashboard() {
           background: #f8fafc;
           font-size: 0.875rem;
           font-weight: 600;
+          min-width: 0;
+          max-width: 100%;
+          box-sizing: border-box;
         }
 
         .save-btn {
@@ -1903,17 +1921,19 @@ export default function Dashboard() {
             grid-template-columns: 1fr;
           }
           .form-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
           }
           .form-group.full {
-            grid-column: span 1;
+            grid-column: span 2;
           }
           .modal-overlay {
             padding: 8px;
           }
           .modal-content {
             padding: 14px;
-            max-height: 82dvh;
+            max-width: min(450px, calc(100vw - 16px));
+            max-height: calc(100dvh - 20px);
             border-radius: 14px;
           }
           .quick-inputs {

@@ -490,7 +490,7 @@ export default function Historico() {
         )}
       </div>
 
-      {/* Barra Rápida de Seleção de Período & Filtro Instantâneo de Mês */}
+      {/* Barra Rápida de Seleção de Período & Filtro Instantâneo */}
       <div className="quick-period-bar">
         <div className="chip-group scrollable">
           {[
@@ -501,6 +501,7 @@ export default function Historico() {
             { id: 'mes', label: 'Este Mês' },
             { id: 'selecionar_mes', label: 'Escolher Mês 📅' },
             { id: 'ano', label: 'Este Ano' },
+            { id: 'custom', label: 'Personalizado 📆' },
           ].map(p => (
             <button 
               key={p.id}
@@ -548,6 +549,24 @@ export default function Historico() {
             />
           </motion.div>
         )}
+
+        {periodFilter === 'custom' && (
+          <motion.div 
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="quick-month-selector card glass"
+            style={{ flexDirection: 'row', flexWrap: 'wrap', gap: '12px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label>De:</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label>Até:</label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* Painel de Filtros Expansível */}
@@ -560,7 +579,7 @@ export default function Historico() {
             className="filter-panel card glass"
           >
             <div className="panel-header">
-              <h3>Filtros & Ordenação</h3>
+              <h3>Filtros Avançados & Ordenação</h3>
               {hasActiveFilters && (
                 <button className="reset-btn" onClick={resetFilters}>
                   <RotateCcw size={14} /> Limpar Filtros
@@ -568,72 +587,9 @@ export default function Historico() {
               )}
             </div>
 
-            <div className="filter-group">
-              <label>Período de Análise</label>
-              <div className="chip-group">
-                {[
-                  { id: 'tudo', label: 'Tudo' },
-                  { id: 'hoje', label: 'Hoje' },
-                  { id: 'semana', label: '7 Dias' },
-                  { id: 'selecionar_semana', label: 'Escolher Semana 🗓️' },
-                  { id: 'mes', label: 'Este Mês' },
-                  { id: 'selecionar_mes', label: 'Escolher Mês 📅' },
-                  { id: 'ano', label: 'Este Ano' },
-                  { id: 'custom', label: 'Personalizado' },
-                ].map(p => (
-                  <button 
-                    key={p.id}
-                    className={`chip ${periodFilter === p.id ? 'active' : ''}`}
-                    onClick={() => setPeriodFilter(p.id as any)}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {periodFilter === 'selecionar_semana' && (
-              <div className="custom-dates">
-                <div className="date-input">
-                  <label>Semana Selecionada:</label>
-                  <input 
-                    type="week" 
-                    value={selectedWeek} 
-                    onChange={e => setSelectedWeek(e.target.value)} 
-                  />
-                </div>
-              </div>
-            )}
-
-            {periodFilter === 'selecionar_mes' && (
-              <div className="custom-dates">
-                <div className="date-input">
-                  <label>Mês Selecionado:</label>
-                  <input 
-                    type="month" 
-                    value={selectedMonth} 
-                    onChange={e => setSelectedMonth(e.target.value)} 
-                  />
-                </div>
-              </div>
-            )}
-
-            {periodFilter === 'custom' && (
-              <div className="custom-dates">
-                <div className="date-input">
-                  <label>De:</label>
-                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                </div>
-                <div className="date-input">
-                  <label>Até:</label>
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                </div>
-              </div>
-            )}
-
             <div className="filter-row">
               <div className="filter-group half">
-                <label>Atividade</label>
+                <label>Atividade / Categoria</label>
                 <select value={platformFilter} onChange={e => setPlatformFilter(e.target.value as any)}>
                   <option value="todos">Todas</option>
                   <option value="Aplicativos">Aplicativos (Trabalho)</option>
@@ -1038,7 +994,7 @@ export default function Historico() {
                           if (costEl && litresEl) {
                             const cost = parseFloat(costEl.value);
                             const litres = parseFloat(litresEl.value);
-                            const km = kmEl.value ? parseInt(kmEl.value) : undefined;
+                            const km = kmEl.value ? parseInt(kmEl.value) : (editingItem.kmEnd || editingItem.kmStart);
                             
                             if (cost > 0 && litres > 0) {
                               const newF = {
@@ -1717,6 +1673,9 @@ export default function Historico() {
           background: #f8fafc;
           font-size: 0.875rem;
           font-weight: 600;
+          min-width: 0;
+          max-width: 100%;
+          box-sizing: border-box;
         }
 
         .save-btn {
@@ -1849,18 +1808,19 @@ export default function Historico() {
             flex-direction: column;
           }
           .form-grid {
-            grid-template-columns: 1fr;
-            gap: 10px;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
           }
           .form-group.full {
-            grid-column: span 1;
+            grid-column: span 2;
           }
           .modal-overlay {
             padding: 8px;
           }
           .modal-content {
             padding: 14px;
-            max-height: 82dvh;
+            max-width: min(450px, calc(100vw - 16px));
+            max-height: calc(100dvh - 20px);
             border-radius: 14px;
           }
           .quick-inputs {
