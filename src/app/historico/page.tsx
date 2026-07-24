@@ -1799,19 +1799,21 @@ export default function Historico() {
             flex-direction: column;
           }
           .form-grid {
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            grid-template-columns: 1fr !important;
+            gap: 10px;
             width: 100%;
           }
           .form-group.full, .form-group.full-mobile {
-            grid-column: span 2;
+            grid-column: span 1 !important;
           }
           .modal-overlay {
             padding: 8px;
             overflow-x: hidden;
+            align-items: center;
+            justify-content: center;
           }
           .modal-content {
-            padding: 12px;
+            padding: 14px 12px;
             max-width: calc(100vw - 16px);
             width: calc(100vw - 16px);
             max-height: calc(100dvh - 16px);
@@ -1822,17 +1824,30 @@ export default function Historico() {
           .edit-form {
             overflow-x: hidden;
             width: 100%;
+            gap: 10px;
+          }
+          .form-group input, .form-group select {
+            font-size: 1rem !important;
+            padding: 10px 12px;
+            width: 100%;
+            box-sizing: border-box;
           }
           .quick-inputs {
-            grid-template-columns: 1fr 1fr;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
           }
-          .quick-inputs input:nth-child(3) {
-            grid-column: span 2;
+          .quick-inputs input {
+            width: 100% !important;
+            box-sizing: border-box;
+            font-size: 1rem !important;
           }
           .quick-inputs button {
-            grid-column: span 2;
-            width: 100%;
-            height: 34px;
+            width: 100% !important;
+            height: 38px;
+            font-size: 1rem;
+            font-weight: 700;
           }
         }
       `}</style>
