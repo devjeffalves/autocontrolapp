@@ -490,86 +490,7 @@ export default function Historico() {
         )}
       </div>
 
-      {/* Barra Rápida de Seleção de Período & Filtro Instantâneo */}
-      <div className="quick-period-bar">
-        <div className="chip-group scrollable">
-          {[
-            { id: 'tudo', label: 'Tudo' },
-            { id: 'hoje', label: 'Hoje' },
-            { id: 'semana', label: 'Esta Semana' },
-            { id: 'selecionar_semana', label: 'Escolher Semana 🗓️' },
-            { id: 'mes', label: 'Este Mês' },
-            { id: 'selecionar_mes', label: 'Escolher Mês 📅' },
-            { id: 'ano', label: 'Este Ano' },
-            { id: 'custom', label: 'Personalizado 📆' },
-          ].map(p => (
-            <button 
-              key={p.id}
-              className={`chip ${periodFilter === p.id ? 'active' : ''}`}
-              onClick={() => {
-                setPeriodFilter(p.id as any);
-                if (p.id === 'selecionar_mes' && !selectedMonth) {
-                  setSelectedMonth(new Date().toISOString().slice(0, 7));
-                }
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        {periodFilter === 'selecionar_semana' && (
-          <motion.div 
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="quick-month-selector card glass"
-          >
-            <Calendar size={16} className="text-muted" />
-            <label>Filtrar Semana:</label>
-            <input 
-              type="week" 
-              value={selectedWeek} 
-              onChange={e => setSelectedWeek(e.target.value)} 
-            />
-          </motion.div>
-        )}
-
-        {periodFilter === 'selecionar_mes' && (
-          <motion.div 
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="quick-month-selector card glass"
-          >
-            <Calendar size={16} className="text-muted" />
-            <label>Filtrar Mês:</label>
-            <input 
-              type="month" 
-              value={selectedMonth} 
-              onChange={e => setSelectedMonth(e.target.value)} 
-            />
-          </motion.div>
-        )}
-
-        {periodFilter === 'custom' && (
-          <motion.div 
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="quick-month-selector card glass"
-            style={{ flexDirection: 'row', flexWrap: 'wrap', gap: '12px' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <label>De:</label>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <label>Até:</label>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-            </div>
-          </motion.div>
-        )}
-      </div>
-
-      {/* Painel de Filtros Expansível */}
+      {/* Painel Unificado de Filtros Expansível */}
       <AnimatePresence>
         {showFilterPanel && (
           <motion.div 
@@ -579,7 +500,7 @@ export default function Historico() {
             className="filter-panel card glass"
           >
             <div className="panel-header">
-              <h3>Filtros Avançados & Ordenação</h3>
+              <h3>Filtros & Ordenação</h3>
               {hasActiveFilters && (
                 <button className="reset-btn" onClick={resetFilters}>
                   <RotateCcw size={14} /> Limpar Filtros
@@ -587,6 +508,76 @@ export default function Historico() {
               )}
             </div>
 
+            {/* Seleção de Período */}
+            <div className="filter-group">
+              <label>Período de Análise</label>
+              <div className="chip-group scrollable">
+                {[
+                  { id: 'tudo', label: 'Tudo' },
+                  { id: 'hoje', label: 'Hoje' },
+                  { id: 'semana', label: 'Esta Semana' },
+                  { id: 'selecionar_semana', label: 'Escolher Semana 🗓️' },
+                  { id: 'mes', label: 'Este Mês' },
+                  { id: 'selecionar_mes', label: 'Escolher Mês 📅' },
+                  { id: 'ano', label: 'Este Ano' },
+                  { id: 'custom', label: 'Personalizado 📆' },
+                ].map(p => (
+                  <button 
+                    key={p.id}
+                    className={`chip ${periodFilter === p.id ? 'active' : ''}`}
+                    onClick={() => {
+                      setPeriodFilter(p.id as any);
+                      if (p.id === 'selecionar_mes' && !selectedMonth) {
+                        setSelectedMonth(new Date().toISOString().slice(0, 7));
+                      }
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              {periodFilter === 'selecionar_semana' && (
+                <div className="custom-dates" style={{ marginTop: '10px' }}>
+                  <div className="date-input">
+                    <label>Semana Selecionada:</label>
+                    <input 
+                      type="week" 
+                      value={selectedWeek} 
+                      onChange={e => setSelectedWeek(e.target.value)} 
+                    />
+                  </div>
+                </div>
+              )}
+
+              {periodFilter === 'selecionar_mes' && (
+                <div className="custom-dates" style={{ marginTop: '10px' }}>
+                  <div className="date-input">
+                    <label>Mês Selecionado:</label>
+                    <input 
+                      type="month" 
+                      value={selectedMonth} 
+                      onChange={e => setSelectedMonth(e.target.value)} 
+                    />
+                  </div>
+                </div>
+              )}
+
+              {periodFilter === 'custom' && (
+                <div className="custom-dates" style={{ marginTop: '10px' }}>
+                  <div className="date-input">
+                    <label>De:</label>
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                  </div>
+                  <div className="date-input">
+                    <label>Até:</label>
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Categoria e Ordenação */}
             <div className="filter-row">
               <div className="filter-group half">
                 <label>Atividade / Categoria</label>
