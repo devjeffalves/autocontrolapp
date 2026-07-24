@@ -949,7 +949,7 @@ export default function Dashboard() {
                       required
                     />
                   </div>
-                  <div className="form-group">
+                  <div className="form-group full-mobile">
                     <label>Início do Turno</label>
                     <input 
                       type="datetime-local" 
@@ -957,7 +957,7 @@ export default function Dashboard() {
                       onChange={e => setEditingItem({...editingItem, startTime: e.target.value})}
                     />
                   </div>
-                  <div className="form-group">
+                  <div className="form-group full-mobile">
                     <label>Fim do Turno</label>
                     <input 
                       type="datetime-local" 
@@ -1923,18 +1923,27 @@ export default function Dashboard() {
           .form-grid {
             grid-template-columns: 1fr 1fr;
             gap: 8px;
+            width: 100%;
           }
-          .form-group.full {
+          .form-group.full, .form-group.full-mobile {
             grid-column: span 2;
           }
           .modal-overlay {
             padding: 8px;
+            overflow-x: hidden;
           }
           .modal-content {
-            padding: 14px;
-            max-width: min(450px, calc(100vw - 16px));
-            max-height: calc(100dvh - 20px);
+            padding: 12px;
+            max-width: calc(100vw - 16px);
+            width: calc(100vw - 16px);
+            max-height: calc(100dvh - 16px);
             border-radius: 14px;
+            overflow-x: hidden;
+            box-sizing: border-box;
+          }
+          .edit-form {
+            overflow-x: hidden;
+            width: 100%;
           }
           .quick-inputs {
             grid-template-columns: 1fr 1fr;
