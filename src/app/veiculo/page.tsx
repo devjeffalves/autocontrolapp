@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Car, Settings, Fuel, Activity, PenLine, Save, X, Plus, Trash2, Camera, Calendar, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import FuelReserveCard from '@/components/FuelReserveCard';
 
 export default function Veiculo() {
   const [isEditing, setIsEditing] = useState(false);
@@ -22,97 +24,98 @@ export default function Veiculo() {
   const [realAvg, setRealAvg] = useState<number | null>(null);
   const [projection, setProjection] = useState<{ nextFuelingKm: number; kmRemaining: number; status: 'ok' | 'warning' | 'urgent' } | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [vRes, rRes] = await Promise.all([
-          fetch('/api/vehicle'),
-          fetch('/api/rides')
-        ]);
-        const vData = await vRes.json();
-        const rData = await rRes.json();
+  const fetchData = async () => {
+    try {
+      const [vRes, rRes] = await Promise.all([
+        fetch('/api/vehicle'),
+        fetch('/api/rides')
+      ]);
+      const vData = await vRes.json();
+      const rData = await rRes.json();
 
-        if (vData.data) setVehicle(vData.data);
+      if (vData.data) setVehicle(vData.data);
+      
+      if (rData.success) {
+        const allRides = rData.data;
         
-        if (rData.success) {
-          const allRides = rData.data;
+        let totalLitres = 0;
+        let totalKm = 0;
+        
+        const closedRides = allRides.filter((r: any) => r.status === 'closed');
+        closedRides.forEach((r: any) => {
+          const rideLitres = r.fuelings?.reduce((acc: number, curr: any) => acc + (curr.litres || 0), 0) || 0;
+          totalLitres += rideLitres;
+          totalKm += (r.kmTotal || 0);
+        });
+        
+        let computedAvg = vData.data?.avgConsumption || 14.5;
+        if (totalLitres > 0) {
+          const calculatedAvg = totalKm / totalLitres;
           
-          let totalLitres = 0;
-          let totalKm = 0;
+          // Consumo é consistente se estiver em uma faixa física realista (ex: entre 6 e 22 km/L)
+          const isAvgInconsistent = calculatedAvg < 6 || calculatedAvg > 22;
           
-          const closedRides = allRides.filter((r: any) => r.status === 'closed');
-          closedRides.forEach((r: any) => {
-            const rideLitres = r.fuelings?.reduce((acc: number, curr: any) => acc + (curr.litres || 0), 0) || 0;
-            totalLitres += rideLitres;
-            totalKm += (r.kmTotal || 0);
-          });
-          
-          let computedAvg = vData.data?.avgConsumption || 14.5;
-          if (totalLitres > 0) {
-            const calculatedAvg = totalKm / totalLitres;
-            
-            // Consumo é consistente se estiver em uma faixa física realista (ex: entre 6 e 22 km/L)
-            const isAvgInconsistent = calculatedAvg < 6 || calculatedAvg > 22;
-            
-            setRealAvg(calculatedAvg);
-            if (!isAvgInconsistent) {
-              computedAvg = calculatedAvg;
-            }
+          setRealAvg(calculatedAvg);
+          if (!isAvgInconsistent) {
+            computedAvg = calculatedAvg;
           }
+        }
 
-          // Achar o abastecimento mais recente considerando KM efetivo
-          let lastFueling: { km: number; litres: number; date: Date } | null = null;
-          const extractedFuelings: Array<{ km: number; litres: number; date: Date }> = [];
+        // Achar o abastecimento mais recente considerando KM efetivo
+        let lastFueling: { km: number; litres: number; date: Date } | null = null;
+        const extractedFuelings: Array<{ km: number; litres: number; date: Date }> = [];
 
-          for (const ride of allRides) {
-            if (ride.fuelings && ride.fuelings.length > 0) {
-              for (const f of ride.fuelings) {
-                if (f.litres && f.litres > 0) {
-                  const effectiveKm = (f.km && f.km > 0) 
-                    ? f.km 
-                    : (ride.kmEnd || ride.kmStart || (vData.data?.currentKm || 0));
-                  const effectiveDate = f.date ? new Date(f.date) : (ride.endTime ? new Date(ride.endTime) : new Date(ride.date));
-                  if (effectiveKm > 0) {
-                    extractedFuelings.push({
-                      km: effectiveKm,
-                      litres: f.litres,
-                      date: effectiveDate
-                    });
-                  }
+        for (const ride of allRides) {
+          if (ride.fuelings && ride.fuelings.length > 0) {
+            for (const f of ride.fuelings) {
+              if (f.litres && f.litres > 0) {
+                const effectiveKm = (f.km && f.km > 0) 
+                  ? f.km 
+                  : (ride.kmEnd || ride.kmStart || (vData.data?.currentKm || 0));
+                const effectiveDate = f.date ? new Date(f.date) : (ride.endTime ? new Date(ride.endTime) : new Date(ride.date));
+                if (effectiveKm > 0) {
+                  extractedFuelings.push({
+                    km: effectiveKm,
+                    litres: f.litres,
+                    date: effectiveDate
+                  });
                 }
               }
             }
           }
-
-          if (extractedFuelings.length > 0) {
-            extractedFuelings.sort((a, b) => b.date.getTime() - a.date.getTime());
-            lastFueling = extractedFuelings[0];
-          }
-
-          if (lastFueling && vData.data) {
-            const nextFuelingKm = lastFueling.km + (lastFueling.litres * computedAvg);
-            const kmRemaining = nextFuelingKm - vData.data.currentKm;
-            
-            let status: 'ok' | 'warning' | 'urgent' = 'ok';
-            if (kmRemaining <= 0) {
-              status = 'urgent';
-            } else if (kmRemaining < 50) {
-              status = 'warning';
-            }
-            
-            setProjection({
-              nextFuelingKm: Math.round(nextFuelingKm),
-              kmRemaining: Math.round(kmRemaining),
-              status
-            });
-          } else {
-            setProjection(null);
-          }
         }
-      } catch (error) {
-        console.error('Erro ao buscar dados:', error);
+
+        if (extractedFuelings.length > 0) {
+          extractedFuelings.sort((a, b) => b.date.getTime() - a.date.getTime());
+          lastFueling = extractedFuelings[0];
+        }
+
+        if (lastFueling && vData.data) {
+          const nextFuelingKm = lastFueling.km + (lastFueling.litres * computedAvg);
+          const kmRemaining = nextFuelingKm - vData.data.currentKm;
+          
+          let status: 'ok' | 'warning' | 'urgent' = 'ok';
+          if (kmRemaining <= 0) {
+            status = 'urgent';
+          } else if (kmRemaining < 50) {
+            status = 'warning';
+          }
+          
+          setProjection({
+            nextFuelingKm: Math.round(nextFuelingKm),
+            kmRemaining: Math.round(kmRemaining),
+            status
+          });
+        } else {
+          setProjection(null);
+        }
       }
-    };
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
@@ -348,9 +351,23 @@ export default function Veiculo() {
                 {projection.status === 'urgent' && 'Reabastecer Imediatamente'}
               </div>
             </div>
+
+            {projection.kmRemaining <= 0 && (
+              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed rgba(239, 68, 68, 0.3)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  Se você já abasteceu e não registrou no aplicativo, informe seu último abastecimento para atualizar a autonomia projetada.
+                </p>
+                <Link href="/novo" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#ef4444', color: 'white', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, textDecoration: 'none', width: 'fit-content' }}>
+                  <Fuel size={14} /> Registrar Abastecimento Agora
+                </Link>
+              </div>
+            )}
           </div>
         </section>
       )}
+
+      {/* Card da Reserva de Combustível com Recipiente Animado */}
+      <FuelReserveCard vehicle={vehicle} onUpdateVehicle={fetchData} />
 
       <section className="maintenance-list">
         <div className="section-header">

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock } from 'lucide-react';
 import Link from 'next/link';
+import FuelReserveCard from '@/components/FuelReserveCard';
 
 export default function Dashboard() {
   const getCurrentISOWeek = () => {
@@ -166,34 +167,35 @@ export default function Dashboard() {
     window.speechSynthesis.speak(utterance);
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [ridesRes, vehicleRes] = await Promise.all([
-          fetch('/api/rides'),
-          fetch('/api/vehicle')
-        ]);
+  const fetchData = async () => {
+    try {
+      const [ridesRes, vehicleRes] = await Promise.all([
+        fetch('/api/rides'),
+        fetch('/api/vehicle')
+      ]);
+      
+      const ridesData = ridesRes.headers.get('content-type')?.includes('application/json') 
+        ? await ridesRes.json() 
+        : { success: false, error: 'Resposta não é JSON' };
         
-        const ridesData = ridesRes.headers.get('content-type')?.includes('application/json') 
-          ? await ridesRes.json() 
-          : { success: false, error: 'Resposta não é JSON' };
-          
-        const vehicleData = vehicleRes.headers.get('content-type')?.includes('application/json') 
-          ? await vehicleRes.json() 
-          : { success: false, error: 'Resposta não é JSON' };
+      const vehicleData = vehicleRes.headers.get('content-type')?.includes('application/json') 
+        ? await vehicleRes.json() 
+        : { success: false, error: 'Resposta não é JSON' };
 
-        if (ridesData.success) setRides(ridesData.data);
-        if (vehicleData.success) setVehicle(vehicleData.data);
-        
-        if (!ridesData.success || !vehicleData.success) {
-          console.warn('Alguns dados não foram carregados corretamente:', { ridesData, vehicleData });
-        }
-      } catch (error) {
-        console.error('Erro ao buscar dados:', error);
-      } finally {
-        setLoading(false);
+      if (ridesData.success) setRides(ridesData.data);
+      if (vehicleData.success) setVehicle(vehicleData.data);
+      
+      if (!ridesData.success || !vehicleData.success) {
+        console.warn('Alguns dados não foram carregados corretamente:', { ridesData, vehicleData });
       }
-    };
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
@@ -816,8 +818,21 @@ export default function Dashboard() {
               )}
             </div>
           </div>
+          {projection.kmRemaining <= 0 && (
+            <div className="proj-urgent-action">
+              <p className="proj-urgent-text">
+                Se você já abasteceu e não registrou no aplicativo, registe seu último abastecimento para atualizar a projeção.
+              </p>
+              <Link href="/novo" className="proj-urgent-btn">
+                <Fuel size={14} /> Registrar Abastecimento Agora
+              </Link>
+            </div>
+          )}
         </motion.div>
       )}
+
+      {/* Card da Reserva de Combustível com Recipiente Animado */}
+      <FuelReserveCard vehicle={vehicle} onUpdateVehicle={fetchData} />
 
       <section className="recent-activity">
         <div className="section-header">
@@ -2008,6 +2023,39 @@ export default function Dashboard() {
           font-size: 0.8rem;
           font-weight: 600;
           color: var(--text-muted);
+        }
+        .proj-remaining.danger {
+          color: var(--danger);
+        }
+        .proj-urgent-action {
+          margin-top: 12px;
+          padding-top: 10px;
+          border-top: 1px dashed rgba(239, 68, 68, 0.25);
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .proj-urgent-text {
+          font-size: 0.78rem;
+          color: #64748b;
+          line-height: 1.4;
+        }
+        .proj-urgent-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 14px;
+          background: #ef4444;
+          color: white;
+          border-radius: 8px;
+          font-size: 0.8rem;
+          font-weight: 700;
+          text-decoration: none;
+          width: fit-content;
+          transition: background 0.2s;
+        }
+        .proj-urgent-btn:hover {
+          background: #dc2626;
         }
         .proj-remaining strong {
           color: var(--primary);

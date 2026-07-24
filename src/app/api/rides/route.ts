@@ -64,12 +64,15 @@ export async function POST(request: NextRequest) {
         endTime: fuelingDate
       });
 
-      // Atualizar KM do veículo se informado KM maior
+      // Atualizar KM do veículo e desativar reserva se informado
+      const updateData: any = { reserveActive: false, reserveStartKm: 0, lastUpdated: new Date() };
       if (fuelKmNum > 0) {
         await Vehicle.findOneAndUpdate(
-          { currentKm: { $lt: fuelKmNum } },
-          { currentKm: fuelKmNum, lastUpdated: new Date() }
+          {},
+          { ...updateData, $max: { currentKm: fuelKmNum } }
         );
+      } else {
+        await Vehicle.findOneAndUpdate({}, updateData);
       }
 
       return NextResponse.json({ success: true, data: ride }, { status: 201 });
@@ -141,12 +144,15 @@ export async function POST(request: NextRequest) {
       });
       await activeSession.save();
 
-      // Atualizar o KM do veículo se o KM informado for maior
+      // Atualizar o KM do veículo e desativar reserva
+      const updateData: any = { reserveActive: false, reserveStartKm: 0, lastUpdated: new Date() };
       if (fuelKmNum > 0) {
         await Vehicle.findOneAndUpdate(
-          { currentKm: { $lt: fuelKmNum } },
-          { currentKm: fuelKmNum, lastUpdated: new Date() }
+          {},
+          { ...updateData, $max: { currentKm: fuelKmNum } }
         );
+      } else {
+        await Vehicle.findOneAndUpdate({}, updateData);
       }
 
       return NextResponse.json({ success: true, data: activeSession });
