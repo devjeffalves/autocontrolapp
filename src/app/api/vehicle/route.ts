@@ -9,11 +9,11 @@ export async function GET() {
     let vehicle = await Vehicle.findOne({});
     
     if (vehicle) {
-      // Sincronizar o KM atual do veículo com o KM final do último turno cadastrado
+      // Sincronizar o KM atual do veículo com o KM final do último turno se este for superior ao cadastrado
       const latestRide = await Ride.findOne({}).sort({ endTime: -1, date: -1 });
       if (latestRide) {
         const latestRideKm = latestRide.kmEnd || latestRide.kmStart;
-        if (latestRideKm && latestRideKm > 0 && vehicle.currentKm !== latestRideKm) {
+        if (latestRideKm && latestRideKm > vehicle.currentKm) {
           vehicle.currentKm = latestRideKm;
           vehicle.lastUpdated = new Date();
           await vehicle.save();

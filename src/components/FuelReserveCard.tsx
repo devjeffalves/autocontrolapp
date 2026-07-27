@@ -1,12 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Fuel, AlertTriangle, CheckCircle2, RotateCcw, Edit2, Zap, Droplets } from 'lucide-react';
+import { Fuel, AlertTriangle, CheckCircle2, RotateCcw, Edit2, Zap, Droplets, Navigation, Radio, Plus } from 'lucide-react';
 
 interface FuelReserveCardProps {
   vehicle: any;
   onUpdateVehicle?: () => void;
+}
+
+// Função utilitária Haversine para calcular a distância em KM entre 2 coordenadas GPS
+function calculateHaversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Raio da Terra em KM
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserveCardProps) {
@@ -15,6 +28,22 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
   const [isEditingLitres, setIsEditingLitres] = useState(false);
   const [customLitres, setCustomLitres] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Estados de Rastreamento GPS
+  const [isGpsActive, setIsGpsActive] = useState(true);
+  const [gpsStatus, setGpsStatus] = useState<'off' | 'connecting' | 'active' | 'error'>('off');
+  const [gpsMessage, setGpsMessage] = useState('');
+  const [sessionGpsKm, setSessionGpsKm] = useState(0);
+
+  // Refs para chamadas assíncronas e evitar problemas com closures no watchPosition
+  const watchIdRef = useRef<number | null>(null);
+  const lastCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  const sessionKmRef = useRef<number>(0);
+  const currentVehicleKmRef = useRef<number>(vehicle?.currentKm || 0);
+
+  useEffect(() => {
+    currentVehicleKmRef.current = vehicle?.currentKm || 0;
+  }, [vehicle?.currentKm]);
 
   if (!vehicle) return null;
 
@@ -56,6 +85,115 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
     }
   }
 
+  // --- Efeito para Rastreamento GPS Nativo ---
+  useEffect(() => {
+    // Se a reserva não estiver ativa ou o GPS estiver desligado pelo usuário, interrompe o rastreamento
+    if (!reserveActive || !isGpsActive) {
+      if (watchIdRef.current !== null && typeof window !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      setGpsStatus('off');
+      setGpsMessage(reserveActive ? 'GPS Pausado' : 'Reserva inativa');
+      return;
+    }
+
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setGpsStatus('error');
+      setGpsMessage('Geolocalização não suportada neste dispositivo');
+      return;
+    }
+
+    setGpsStatus('connecting');
+    setGpsMessage('Conectando ao GPS do dispositivo...');
+
+    const handlePositionSuccess = (position: GeolocationPosition) => {
+      const { latitude, longitude, accuracy } = position.coords;
+
+      // Filtro de ruído: ignorar leituras com precisão ruim (> 50 metros)
+      if (accuracy > 50) {
+        setGpsStatus('connecting');
+        setGpsMessage(`Sinal de GPS fraco (precisão: ~${Math.round(accuracy)}m)`);
+        return;
+      }
+
+      setGpsStatus('active');
+      setGpsMessage(`GPS Rastreando (${Math.round(accuracy)}m prec.)`);
+
+      if (lastCoordsRef.current) {
+        const deltaKm = calculateHaversineKm(
+          lastCoordsRef.current.lat,
+          lastCoordsRef.current.lng,
+          latitude,
+          longitude
+        );
+
+        // Filtro de movimento:
+        // 1. Ignorar deslocamentos menores que 10 metros (0.01 km) para conter ruído com carro parado
+        // 2. Ignorar desvios irreais superiores a 5 km por leitura instantânea
+        if (deltaKm >= 0.01 && deltaKm < 5.0) {
+          sessionKmRef.current += deltaKm;
+          setSessionGpsKm(sessionKmRef.current);
+
+          const newKm = Math.round((currentVehicleKmRef.current + sessionKmRef.current) * 10) / 10;
+          
+          // Enviar atualização ao backend a cada ~0.1 KM acumulado
+          if (sessionKmRef.current >= 0.1) {
+            sessionKmRef.current = 0;
+            setSessionGpsKm(0);
+            handleUpdateReserveSilent({ currentKm: newKm });
+          }
+        }
+      }
+
+      lastCoordsRef.current = { lat: latitude, lng: longitude };
+    };
+
+    const handlePositionError = (err: GeolocationPositionError) => {
+      setGpsStatus('error');
+      if (err.code === err.PERMISSION_DENIED) {
+        setGpsMessage('Permissão de GPS negada no navegador');
+      } else if (err.code === err.POSITION_UNAVAILABLE) {
+        setGpsMessage('Sinal de GPS indisponível no local');
+      } else {
+        setGpsMessage('Erro ao obter posição GPS');
+      }
+    };
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handlePositionSuccess,
+      handlePositionError,
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 3000,
+      }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null && typeof window !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [reserveActive, isGpsActive]);
+
+  const handleUpdateReserveSilent = async (updateData: any) => {
+    try {
+      const res = await fetch('/api/vehicle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      });
+      const json = await res.json();
+      if (json.success && onUpdateVehicle) {
+        onUpdateVehicle();
+      }
+    } catch (err) {
+      console.error('Erro silencioso ao atualizar reserva:', err);
+    }
+  };
+
   const handleUpdateReserve = async (updateData: any) => {
     setLoading(true);
     try {
@@ -76,6 +214,10 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
   };
 
   const handleActivateReserveNow = () => {
+    lastCoordsRef.current = null;
+    sessionKmRef.current = 0;
+    setSessionGpsKm(0);
+    setIsGpsActive(true);
     handleUpdateReserve({
       reserveActive: true,
       reserveStartKm: currentKm,
@@ -97,6 +239,13 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
     }
   };
 
+  const handleQuickAddKm = (deltaKm: number) => {
+    const newKm = Math.round((currentKm + deltaKm) * 10) / 10;
+    handleUpdateReserve({
+      currentKm: newKm
+    });
+  };
+
   const handleCustomLitresSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const litresNum = parseFloat(customLitres);
@@ -110,6 +259,13 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
   };
 
   const handleDeactivateReserve = () => {
+    if (watchIdRef.current !== null && typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    lastCoordsRef.current = null;
+    sessionKmRef.current = 0;
+    setSessionGpsKm(0);
     handleUpdateReserve({
       reserveActive: false,
       reserveStartKm: 0
@@ -144,6 +300,28 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
           </span>
         )}
       </div>
+
+      {/* Bar de Status do GPS e Controle quando a reserva está ativa */}
+      {reserveActive && (
+        <div className="gps-tracker-bar">
+          <div className="gps-info">
+            <div className={`gps-indicator-dot ${gpsStatus}`} />
+            <Navigation size={14} className={gpsStatus === 'active' ? 'text-emerald-500 animate-spin-slow' : 'text-slate-400'} />
+            <span className="gps-msg">{gpsMessage}</span>
+            {sessionGpsKm > 0 && (
+              <span className="session-km-badge">+{sessionGpsKm.toFixed(1)} km rec.</span>
+            )}
+          </div>
+          <button 
+            className={`gps-toggle-btn ${isGpsActive ? 'active' : ''}`}
+            onClick={() => setIsGpsActive(!isGpsActive)}
+            title={isGpsActive ? 'Desativar Rastreamento GPS' : 'Ativar Rastreamento GPS'}
+          >
+            <Radio size={12} />
+            {isGpsActive ? 'GPS On' : 'GPS Off'}
+          </button>
+        </div>
+      )}
 
       {isEditingLitres && (
         <form onSubmit={handleCustomLitresSubmit} className="inline-edit-form">
@@ -208,8 +386,12 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
                 <span className="detail-val">{reserveStartKm.toLocaleString('pt-BR')} KM</span>
               </div>
               <div className="detail-item">
+                <span className="detail-label">KM Atual Veículo</span>
+                <span className="detail-val highlight">{currentKm.toLocaleString('pt-BR')} KM</span>
+              </div>
+              <div className="detail-item">
                 <span className="detail-label">Limite para Abastecer</span>
-                <span className="detail-val highlight">{Math.round(maxFuelingKm).toLocaleString('pt-BR')} KM</span>
+                <span className="detail-val">{Math.round(maxFuelingKm).toLocaleString('pt-BR')} KM</span>
               </div>
               <div className="detail-item">
                 <span className="detail-label">Rodado na Reserva</span>
@@ -235,6 +417,39 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
           )}
         </div>
       </div>
+
+      {/* Contador Manual Rápido (Quick Increment) quando Reserva está Ativa */}
+      {reserveActive && (
+        <div className="quick-km-bar">
+          <span className="quick-km-label">Incrementar KM Manual:</span>
+          <div className="quick-km-buttons">
+            <button 
+              className="quick-km-btn" 
+              onClick={() => handleQuickAddKm(1)}
+              disabled={loading}
+              title="Adicionar +1 KM ao odômetro"
+            >
+              <Plus size={12} /> 1 KM
+            </button>
+            <button 
+              className="quick-km-btn" 
+              onClick={() => handleQuickAddKm(5)}
+              disabled={loading}
+              title="Adicionar +5 KM ao odômetro"
+            >
+              <Plus size={12} /> 5 KM
+            </button>
+            <button 
+              className="quick-km-btn" 
+              onClick={() => handleQuickAddKm(10)}
+              disabled={loading}
+              title="Adicionar +10 KM ao odômetro"
+            >
+              <Plus size={12} /> 10 KM
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Formulário para Digitar KM da Reserva */}
       <AnimatePresence>
@@ -392,6 +607,83 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
           background: #fee2e2;
           color: #b91c1c;
           animation: pulse 1.5s infinite;
+        }
+
+        /* GPS Tracker Bar */
+        .gps-tracker-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          padding: 8px 12px;
+          border-radius: 12px;
+          font-size: 0.75rem;
+        }
+
+        .gps-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #334155;
+          font-weight: 600;
+        }
+
+        .gps-indicator-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #94a3b8;
+        }
+
+        .gps-indicator-dot.active {
+          background: #10b981;
+          box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+          animation: pulse 1.5s infinite;
+        }
+
+        .gps-indicator-dot.connecting {
+          background: #f59e0b;
+          animation: pulse 1s infinite;
+        }
+
+        .gps-indicator-dot.error {
+          background: #ef4444;
+        }
+
+        .gps-msg {
+          font-weight: 600;
+          color: #475569;
+        }
+
+        .session-km-badge {
+          background: #e0f2fe;
+          color: #0369a1;
+          font-size: 0.7rem;
+          font-weight: 800;
+          padding: 2px 6px;
+          border-radius: 6px;
+        }
+
+        .gps-toggle-btn {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 10px;
+          border-radius: 8px;
+          border: 1px solid #cbd5e1;
+          background: #ffffff;
+          color: #64748b;
+          font-size: 0.7rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .gps-toggle-btn.active {
+          background: #10b981;
+          color: white;
+          border-color: #059669;
         }
 
         /* Animação do Recipiente / Galão de Combustível */
@@ -580,6 +872,48 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
           border-radius: 6px;
         }
 
+        /* Quick KM Increment Bar */
+        .quick-km-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #f1f5f9;
+          padding: 8px 12px;
+          border-radius: 12px;
+          gap: 8px;
+        }
+
+        .quick-km-label {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #475569;
+        }
+
+        .quick-km-buttons {
+          display: flex;
+          gap: 6px;
+        }
+
+        .quick-km-btn {
+          display: flex;
+          align-items: center;
+          gap: 2px;
+          padding: 4px 10px;
+          border-radius: 6px;
+          background: #ffffff;
+          border: 1px solid #cbd5e1;
+          color: #0f172a;
+          font-size: 0.75rem;
+          font-weight: 800;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .quick-km-btn:hover {
+          background: #e2e8f0;
+          border-color: #94a3b8;
+        }
+
         .inline-edit-form {
           background: #f1f5f9;
           padding: 10px;
@@ -667,6 +1001,17 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
           }
           .canister-details {
             width: 100%;
+          }
+          .quick-km-bar {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .quick-km-buttons {
+            justify-content: space-between;
+          }
+          .quick-km-btn {
+            flex: 1;
+            justify-content: center;
           }
           .reserve-actions {
             flex-direction: column;
