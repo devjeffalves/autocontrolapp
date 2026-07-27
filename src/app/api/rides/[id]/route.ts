@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Ride from '@/models/Ride';
+import Vehicle from '@/models/Vehicle';
 import { localInputValueToDate } from '@/lib/dateUtils';
 
 export async function PUT(
@@ -14,15 +15,15 @@ export async function PUT(
 
     if (body.startTime) body.startTime = localInputValueToDate(body.startTime);
     if (body.endTime) body.endTime = localInputValueToDate(body.endTime);
-    if (body.date) body.date = localInputValueToDate(body.date);
+    if (body.date) body.date = localInputValueToDate(body.date || body.startTime);
 
-    // Se estiver atualizando kmEnd, recalcular kmTotal
+    // Recalcular kmTotal
     if (body.kmEnd !== undefined && body.kmStart !== undefined) {
-      body.kmTotal = body.kmEnd - body.kmStart;
+      body.kmTotal = Math.max(0, Number(body.kmEnd) - Number(body.kmStart));
     } else if (body.kmEnd !== undefined) {
       const ride = await Ride.findById(id);
       if (ride) {
-        body.kmTotal = body.kmEnd - ride.kmStart;
+        body.kmTotal = Math.max(0, Number(body.kmEnd) - Number(ride.kmStart));
       }
     }
 
@@ -33,6 +34,11 @@ export async function PUT(
 
     if (!updatedRide) {
       return NextResponse.json({ success: false, error: 'Registro não encontrado' }, { status: 404 });
+    }
+
+    // Sincronizar KM do veículo se o novo kmEnd for superior
+    if (body.kmEnd && Number(body.kmEnd) > 0) {
+      await Vehicle.findOneAndUpdate({}, { $max: { currentKm: Number(body.kmEnd) } });
     }
 
     return NextResponse.json({ success: true, data: updatedRide });
