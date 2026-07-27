@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Ride from '@/models/Ride';
 import Vehicle from '@/models/Vehicle';
+import { localInputValueToDate } from '@/lib/dateUtils';
 
-// Helper para parse seguro de datas enviadas pelo cliente
+// Helper para parse seguro de datas enviadas pelo cliente sem deslocamento fuso horário
 function parseDateInput(dateInput: any): Date {
   if (!dateInput) return new Date();
   if (dateInput instanceof Date) return dateInput;
-  const parsed = new Date(dateInput);
-  return isNaN(parsed.getTime()) ? new Date() : parsed;
+  return localInputValueToDate(dateInput);
 }
 
 export async function GET(request: NextRequest) {
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       query = { status };
     }
 
-    const rides = await Ride.find(query).sort({ date: -1 });
+    const rides = await Ride.find(query).sort({ date: -1 }).lean();
     return NextResponse.json({ success: true, data: rides });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });

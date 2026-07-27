@@ -7,6 +7,7 @@ import {
   Fuel, Gauge, Clock, Award, ChevronDown, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { dateToLocalInputValue } from '@/lib/dateUtils';
 
 export default function Historico() {
   const [history, setHistory] = useState<any[]>([]);
@@ -83,10 +84,7 @@ export default function Historico() {
 
   const formatForDateTimeInput = (dateVal: any) => {
     if (!dateVal) return '';
-    const date = new Date(dateVal);
-    if (isNaN(date.getTime())) return '';
-    const tzoffset = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - tzoffset).toISOString().slice(0, 16);
+    return dateToLocalInputValue(dateVal);
   };
 
   const handleDelete = async (id: string) => {

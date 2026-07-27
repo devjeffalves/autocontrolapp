@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Ride from '@/models/Ride';
+import { localInputValueToDate } from '@/lib/dateUtils';
 
 export async function PUT(
   request: NextRequest,
@@ -10,6 +11,10 @@ export async function PUT(
     await dbConnect();
     const body = await request.json();
     const { id } = await params;
+
+    if (body.startTime) body.startTime = localInputValueToDate(body.startTime);
+    if (body.endTime) body.endTime = localInputValueToDate(body.endTime);
+    if (body.date) body.date = localInputValueToDate(body.date);
 
     // Se estiver atualizando kmEnd, recalcular kmTotal
     if (body.kmEnd !== undefined && body.kmStart !== undefined) {

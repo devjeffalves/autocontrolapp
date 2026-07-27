@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus, Mic, MicOff, Pause, Coffee } from 'lucide-react';
 import Link from 'next/link';
+import { dateToLocalInputValue } from '@/lib/dateUtils';
 
 export default function NovoRegistro() {
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -11,10 +12,7 @@ export default function NovoRegistro() {
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
-  const getLocalDateTimeString = () => {
-    const tzoffset = (new Date()).getTimezoneOffset() * 60000;
-    return (new Date(Date.now() - tzoffset)).toISOString().slice(0, 16);
-  };
+  const getLocalDateTimeString = (date?: Date) => dateToLocalInputValue(date || new Date());
 
   // Form states for different actions
   const [startData, setStartData] = useState(() => ({ kmStart: '', platform: 'Aplicativos', startTime: getLocalDateTimeString() }));

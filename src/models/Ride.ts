@@ -47,9 +47,12 @@ const RideSchema: Schema = new Schema({
   earnings: { type: Number, default: 0 },
   status: { type: String, enum: ['open', 'paused', 'closed'], default: 'open' },
   startTime: { type: Date },
-  endTime: { type: Date },
   date: { type: Date, required: true, default: Date.now },
   createdAt: { type: Date, default: Date.now },
 });
+
+RideSchema.index({ status: 1 });
+RideSchema.index({ date: -1 });
+RideSchema.index({ status: 1, date: -1 });
 
 export default mongoose.models.Ride || mongoose.model<IRide>('Ride', RideSchema);

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock } from 'lucide-react';
 import Link from 'next/link';
 import FuelReserveCard from '@/components/FuelReserveCard';
+import { dateToLocalInputValue } from '@/lib/dateUtils';
 
 export default function Dashboard() {
   const getCurrentISOWeek = () => {
@@ -386,10 +387,7 @@ export default function Dashboard() {
 
   const formatForDateTimeInput = (dateVal: any) => {
     if (!dateVal) return '';
-    const date = new Date(dateVal);
-    if (isNaN(date.getTime())) return '';
-    const tzoffset = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - tzoffset).toISOString().slice(0, 16);
+    return dateToLocalInputValue(dateVal);
   };
   
   const netProfit = totalEarnings - estimatedFuelCost;
