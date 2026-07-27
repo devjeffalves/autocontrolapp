@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, ChevronRight, Filter, Loader2, Pencil, Trash2, X, Save, 
   Search, RotateCcw, ArrowUpDown, TrendingUp, DollarSign, Navigation, 
-  Fuel, Gauge, Clock, Award, ChevronDown, Check
+  Fuel, Gauge, Clock, Award, ChevronDown, Check, ChevronUp, Coffee, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dateToLocalInputValue } from '@/lib/dateUtils';
@@ -15,6 +15,7 @@ export default function Historico() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [vehicle, setVehicle] = useState<any>(null);
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   // Estados dos Filtros
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -685,52 +686,185 @@ export default function Historico() {
                   )}
                 </div>
               ) : (
-                filteredHistory.map((item, index) => (
-                  <motion.div 
-                    key={item._id || index} 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ delay: Math.min(index * 0.03, 0.3) }}
-                    className={`history-item glass ${isDeleting === item._id ? 'deleting' : ''}`}
-                  >
-                    <div className="history-date">
-                      <div className="date-group">
-                        <Calendar size={14} className="text-muted" />
-                        <span>{new Date(item.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                      </div>
-                      <div className="actions">
-                        <button className="action-btn edit" onClick={() => setEditingItem(item)} title="Editar">
-                          <Pencil size={14} />
-                        </button>
-                        <button className="action-btn delete" onClick={() => handleDelete(item._id)} title="Excluir">
-                          {isDeleting === item._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                        </button>
-                      </div>
-                    </div>
+                filteredHistory.map((item, index) => {
+                  const itemId = item._id || index.toString();
+                  const isExpanded = expandedItemId === itemId;
+                  const toggleExpand = () => setExpandedItemId(isExpanded ? null : itemId);
 
-                    <div className="history-main mt-2">
-                      <div>
-                        <span className={`platform-tag ${item.platform?.toLowerCase()}`}>
-                          {item.platform || 'Aplicativos'}
-                        </span>
-                        <p className="history-meta">
-                          {(item.kmEnd || 0) - item.kmStart} km • {item.rides || 0} corridas
-                        </p>
+                  const kmTotal = item.kmTotal || Math.max(0, (item.kmEnd || 0) - item.kmStart);
+                  
+                  // Horários e Duração
+                  let durationStr = '';
+                  let hoursDecimal = 0;
+                  if (item.startTime && item.endTime) {
+                    const diffMs = new Date(item.endTime).getTime() - new Date(item.startTime).getTime();
+                    const diffMin = Math.max(0, Math.round(diffMs / 60000));
+                    const h = Math.floor(diffMin / 60);
+                    const m = diffMin % 60;
+                    durationStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                    hoursDecimal = diffMin > 0 ? diffMin / 60 : 0;
+                  }
+
+                  // Cálculos Financeiros
+                  const earnings = item.earnings || 0;
+                  const ridesCount = item.rides || 0;
+                  const estimatedFuelCost = kmTotal > 0 ? (kmTotal / globalConsumptionNum) * avgFuelPrice : 0;
+                  const netProfit = earnings - estimatedFuelCost;
+                  
+                  const profitPerHour = hoursDecimal > 0 ? earnings / hoursDecimal : 0;
+                  const netProfitPerHour = hoursDecimal > 0 ? netProfit / hoursDecimal : 0;
+                  const earningsPerKm = kmTotal > 0 ? earnings / kmTotal : 0;
+                  const netProfitPerKm = kmTotal > 0 ? netProfit / kmTotal : 0;
+                  const avgPerRide = ridesCount > 0 ? earnings / ridesCount : 0;
+
+                  const startTimeStr = item.startTime ? new Date(item.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null;
+                  const endTimeStr = item.endTime ? new Date(item.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null;
+
+                  return (
+                    <motion.div 
+                      key={itemId} 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ delay: Math.min(index * 0.03, 0.3) }}
+                      className={`history-item glass ${isDeleting === item._id ? 'deleting' : ''}`}
+                    >
+                      <div className="history-date">
+                        <div className="date-group">
+                          <Calendar size={14} className="text-muted" />
+                          <span className="date-text">{new Date(item.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          {startTimeStr && endTimeStr && (
+                            <span className="time-badge">
+                              <Clock size={12} /> {startTimeStr} às {endTimeStr} ({durationStr})
+                            </span>
+                          )}
+                        </div>
+                        <div className="actions">
+                          <button className="action-btn edit" onClick={() => setEditingItem(item)} title="Editar">
+                            <Pencil size={14} />
+                          </button>
+                          <button className="action-btn delete" onClick={() => handleDelete(item._id)} title="Excluir">
+                            {isDeleting === item._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          </button>
+                        </div>
                       </div>
-                      <div className="earnings-group">
-                        <span className="earning-value">
-                          R$ {(item.earnings || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                        {item.platform !== 'Passeio' && (
-                          <span className="profit-badge positive">
-                            Lucro: R$ {(((item.earnings || 0) - (((item.kmEnd || 0) - item.kmStart) / globalConsumptionNum) * avgFuelPrice)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+
+                      <div className="history-main mt-2">
+                        <div>
+                          <div className="tags-row">
+                            <span className={`platform-tag ${item.platform?.toLowerCase()}`}>
+                              {item.platform || 'Aplicativos'}
+                            </span>
+                            {profitPerHour >= 35 && (
+                              <span className="efficiency-badge high">
+                                <Zap size={10} /> Alta Rentabilidade ({profitPerHour.toFixed(0)}/h)
+                              </span>
+                            )}
+                          </div>
+                          <p className="history-meta">
+                            <strong>{kmTotal} km</strong> rodados • <strong>{ridesCount}</strong> corridas
+                          </p>
+                        </div>
+                        <div className="earnings-group">
+                          <span className="earning-value">
+                            R$ {earnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
-                        )}
+                          {item.platform !== 'Passeio' && (
+                            <span className="profit-badge positive">
+                              Lucro: R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))
+
+                      {/* Botão de Expansão de Detalhes */}
+                      <button className="expand-details-btn" onClick={toggleExpand}>
+                        <span>{isExpanded ? 'Recolher Detalhes' : 'Ver Ficha Técnica do Turno'}</span>
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+
+                      {/* Painel Expansível de Detalhes do Turno */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="expanded-details-panel"
+                          >
+                            <div className="details-grid">
+                              <div className="detail-card">
+                                <span className="detail-card-label">Rendimento / Hora</span>
+                                <strong className="detail-card-value" style={{ color: '#10b981' }}>
+                                  {profitPerHour > 0 ? `R$ ${profitPerHour.toFixed(2)}/h` : 'N/A'}
+                                </strong>
+                                <span className="detail-card-sub">Lucro: R$ {netProfitPerHour.toFixed(2)}/h</span>
+                              </div>
+
+                              <div className="detail-card">
+                                <span className="detail-card-label">Faturamento / KM</span>
+                                <strong className="detail-card-value" style={{ color: '#0284c7' }}>
+                                  R$ {earningsPerKm.toFixed(2)}/km
+                                </strong>
+                                <span className="detail-card-sub">Lucro: R$ {netProfitPerKm.toFixed(2)}/km</span>
+                              </div>
+
+                              <div className="detail-card">
+                                <span className="detail-card-label">Média p/ Corrida</span>
+                                <strong className="detail-card-value">
+                                  {avgPerRide > 0 ? `R$ ${avgPerRide.toFixed(2)}` : 'N/A'}
+                                </strong>
+                                <span className="detail-card-sub">{ridesCount} corridas no turno</span>
+                              </div>
+
+                              <div className="detail-card">
+                                <span className="detail-card-label">Hodômetro (KM)</span>
+                                <strong className="detail-card-value">
+                                  {item.kmStart} ➔ {item.kmEnd || '---'}
+                                </strong>
+                                <span className="detail-card-sub">Distância: {kmTotal} km</span>
+                              </div>
+                            </div>
+
+                            {/* Seção de Abastecimentos do Turno se houver */}
+                            {item.fuelings && item.fuelings.length > 0 && (
+                              <div className="shift-sub-section">
+                                <div className="sub-section-title">
+                                  <Fuel size={14} /> Abastecimentos no Turno ({item.fuelings.length})
+                                </div>
+                                <div className="sub-section-list">
+                                  {item.fuelings.map((f: any, fIdx: number) => (
+                                    <div key={fIdx} className="sub-list-item">
+                                      <span>{f.litres?.toFixed(1)} L • R$ {f.cost?.toFixed(2)} {f.litres ? `(R$ ${(f.cost / f.litres).toFixed(2)}/L)` : ''}</span>
+                                      <span className="text-muted">{f.km ? `KM no posto: ${f.km}` : ''}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Seção de Pausas do Turno se houver */}
+                            {item.pauses && item.pauses.length > 0 && (
+                              <div className="shift-sub-section">
+                                <div className="sub-section-title">
+                                  <Coffee size={14} /> Pausas Registradas ({item.pauses.length})
+                                </div>
+                                <div className="sub-section-list">
+                                  {item.pauses.map((p: any, pIdx: number) => (
+                                    <div key={pIdx} className="sub-list-item">
+                                      <span>Pausa {pIdx + 1}: {new Date(p.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                      <span className="text-muted">{p.endTime ? `até ${new Date(p.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Em andamento'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })
               )}
             </AnimatePresence>
           </div>
@@ -1847,6 +1981,147 @@ export default function Historico() {
             font-size: 1rem;
             font-weight: 700;
           }
+        }
+
+        .date-text {
+          font-weight: 700;
+        }
+
+        .time-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: #f1f5f9;
+          color: #475569;
+          padding: 2px 8px;
+          border-radius: 6px;
+          font-size: 0.7rem;
+          font-weight: 700;
+        }
+
+        .tags-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 4px;
+        }
+
+        .efficiency-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          font-size: 0.625rem;
+          font-weight: 800;
+          padding: 2px 6px;
+          border-radius: 4px;
+          text-transform: uppercase;
+        }
+
+        .efficiency-badge.high {
+          background: #dcfce7;
+          color: #15803d;
+        }
+
+        .expand-details-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          width: 100%;
+          padding: 8px 12px;
+          background: #f8fafc;
+          border: 1px dashed #cbd5e1;
+          border-radius: 10px;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--primary);
+          cursor: pointer;
+          margin-top: 8px;
+          transition: all 0.2s ease;
+        }
+
+        .expand-details-btn:hover {
+          background: #f1f5f9;
+          border-color: var(--primary);
+        }
+
+        .expanded-details-panel {
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-top: 10px;
+          padding-top: 12px;
+          border-top: 1px dashed #e2e8f0;
+        }
+
+        .details-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+          gap: 8px;
+        }
+
+        .detail-card {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          padding: 10px 12px;
+          border-radius: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .detail-card-label {
+          font-size: 0.65rem;
+          font-weight: 700;
+          color: #64748b;
+          text-transform: uppercase;
+        }
+
+        .detail-card-value {
+          font-size: 0.95rem;
+          font-weight: 800;
+          color: #0f172a;
+        }
+
+        .detail-card-sub {
+          font-size: 0.65rem;
+          font-weight: 600;
+          color: #64748b;
+        }
+
+        .shift-sub-section {
+          background: #f1f5f9;
+          padding: 10px 12px;
+          border-radius: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .sub-section-title {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.75rem;
+          font-weight: 800;
+          color: #334155;
+        }
+
+        .sub-section-list {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .sub-list-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: #0f172a;
+          padding: 2px 0;
         }
       `}</style>
     </div>
