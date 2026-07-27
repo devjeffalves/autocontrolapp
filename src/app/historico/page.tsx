@@ -7,7 +7,7 @@ import {
   Fuel, Gauge, Clock, Award, ChevronDown, Check, ChevronUp, Coffee, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { dateToLocalInputValue } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR } from '@/lib/dateUtils';
 
 export default function Historico() {
   const [history, setHistory] = useState<any[]>([]);
@@ -717,8 +717,8 @@ export default function Historico() {
                   const netProfitPerKm = kmTotal > 0 ? netProfit / kmTotal : 0;
                   const avgPerRide = ridesCount > 0 ? earnings / ridesCount : 0;
 
-                  const startTimeStr = item.startTime ? new Date(item.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null;
-                  const endTimeStr = item.endTime ? new Date(item.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null;
+                  const startTimeStr = item.startTime ? formatTimePtBR(item.startTime) : null;
+                  const endTimeStr = item.endTime ? formatTimePtBR(item.endTime) : null;
 
                   return (
                     <motion.div 
@@ -732,7 +732,7 @@ export default function Historico() {
                       <div className="history-date">
                         <div className="date-group">
                           <Calendar size={14} className="text-muted" />
-                          <span className="date-text">{new Date(item.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          <span className="date-text">{formatDatePtBR(item.date)}</span>
                           {startTimeStr && endTimeStr && (
                             <span className="time-badge">
                               <Clock size={12} /> {startTimeStr} às {endTimeStr} ({durationStr})
@@ -852,8 +852,8 @@ export default function Historico() {
                                 <div className="sub-section-list">
                                   {item.pauses.map((p: any, pIdx: number) => (
                                     <div key={pIdx} className="sub-list-item">
-                                      <span>Pausa {pIdx + 1}: {new Date(p.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                                      <span className="text-muted">{p.endTime ? `até ${new Date(p.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Em andamento'}</span>
+                                      <span>Pausa {pIdx + 1}: {formatTimePtBR(p.startTime)}</span>
+                                      <span className="text-muted">{p.endTime ? `até ${formatTimePtBR(p.endTime)}` : 'Em andamento'}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -946,7 +946,7 @@ export default function Historico() {
                     <div className="history-date">
                       <div className="date-group">
                         <Calendar size={14} className="text-muted" />
-                        <span>{fuel.date.toLocaleDateString('pt-BR')} às {fuel.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>{formatDatePtBR(fuel.date)} às {formatTimePtBR(fuel.date)}</span>
                       </div>
                       <span className="platform-tag" style={{ background: '#0284c7', color: 'white' }}>
                         Combustível

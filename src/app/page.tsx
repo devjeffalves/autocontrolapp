@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock } from 'lucide-react';
 import Link from 'next/link';
 import FuelReserveCard from '@/components/FuelReserveCard';
-import { dateToLocalInputValue } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR } from '@/lib/dateUtils';
 
 export default function Dashboard() {
   const getCurrentISOWeek = () => {
@@ -672,7 +672,7 @@ export default function Dashboard() {
             <div className="pulse-icon" />
             <div>
               <h3 className="alert-title">Turno em andamento</h3>
-              <p className="alert-desc">Iniciado às {new Date(activeSession.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • {activeSession.kmStart} KM</p>
+              <p className="alert-desc">Iniciado às {formatTimePtBR(activeSession.startTime || activeSession.date)} • {activeSession.kmStart} KM</p>
             </div>
           </div>
           <div className="alert-actions">

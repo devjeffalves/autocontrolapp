@@ -1,6 +1,6 @@
 /**
  * Utilitários centralizados para tratamento de datas e fuso horário (America/Sao_Paulo UTC-3).
- * Evita o bug de deslocamento de 3 horas em entradas datetime-local e envios para a API.
+ * Evita o bug de deslocamento de 3 horas em entradas datetime-local e exibições na interface.
  */
 
 /**
@@ -8,6 +8,13 @@
  * utilizando os componentes de HORA LOCAL do navegador do usuário.
  */
 export function dateToLocalInputValue(dateInput: Date | string | number = new Date()): string {
+  if (typeof dateInput === 'string') {
+    const match = dateInput.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+    if (match) {
+      return `${match[1]}T${match[2]}`;
+    }
+  }
+
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   if (isNaN(date.getTime())) {
     const now = new Date();
@@ -46,19 +53,45 @@ export function localInputValueToISO(inputValue: string): string {
 }
 
 /**
- * Formata uma data para exibição de hora em pt-BR (ex: "14:30")
+ * Formata uma data/timestamp para exibição de hora em pt-BR (ex: "09:22").
+ * Preserva a hora gravada sem subtrair 3 horas indevidamente do fuso horário UTC.
  */
 export function formatTimePtBR(dateInput: Date | string | number): string {
+  if (!dateInput) return '--:--';
+  
+  if (typeof dateInput === 'string') {
+    const match = dateInput.match(/T(\d{2}):(\d{2})/);
+    if (match) {
+      return `${match[1]}:${match[2]}`;
+    }
+  }
+
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   if (isNaN(date.getTime())) return '--:--';
-  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
 /**
- * Formata uma data para exibição no formato pt-BR (ex: "27/07/2026")
+ * Formata uma data para exibição no formato pt-BR (ex: "26 de jul. de 2026")
  */
 export function formatDatePtBR(dateInput: Date | string | number): string {
+  if (!dateInput) return '--/--/----';
+  
+  if (typeof dateInput === 'string') {
+    const match = dateInput.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const day = parseInt(match[3], 10);
+      const d = new Date(year, month, day);
+      return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  }
+
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   if (isNaN(date.getTime())) return '--/--/----';
-  return date.toLocaleDateString('pt-BR');
+  return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
 }

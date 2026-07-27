@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus, Mic, MicOff, Pause, Coffee } from 'lucide-react';
 import Link from 'next/link';
-import { dateToLocalInputValue } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR } from '@/lib/dateUtils';
 
 export default function NovoRegistro() {
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -493,7 +493,7 @@ export default function NovoRegistro() {
                   }}>
                     {activeSession.status === 'paused' ? 'Turno em Pausa ⏸️' : 'Turno em Aberto 🟢'}
                   </div>
-                  <span className="date">{new Date(activeSession.startTime || activeSession.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="date">{formatTimePtBR(activeSession.startTime || activeSession.date)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <button 
@@ -568,7 +568,7 @@ export default function NovoRegistro() {
                   <div className="mini-stat">
                     <span className="label">Início</span>
                     <span className="value" style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)' }}>
-                      {new Date(activeSession.startTime || activeSession.date).toLocaleDateString('pt-BR')} às {new Date(activeSession.startTime || activeSession.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      {formatDatePtBR(activeSession.startTime || activeSession.date)} às {formatTimePtBR(activeSession.startTime || activeSession.date)}
                     </span>
                   </div>
                 )}
