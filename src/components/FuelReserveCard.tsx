@@ -45,13 +45,11 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
     currentVehicleKmRef.current = vehicle?.currentKm || 0;
   }, [vehicle?.currentKm]);
 
-  if (!vehicle) return null;
-
-  const reserveLitres = vehicle.reserveLitres || 5; // Padrão Renault Kwid 2019: 5.0 L
-  const avgConsumption = vehicle.avgConsumption || 14.5;
-  const currentKm = vehicle.currentKm || 0;
-  const reserveStartKm = vehicle.reserveStartKm || 0;
-  const reserveActive = !!vehicle.reserveActive && reserveStartKm > 0;
+  const reserveLitres = vehicle?.reserveLitres || 5; // Padrão Renault Kwid 2019: 5.0 L
+  const avgConsumption = vehicle?.avgConsumption || 14.5;
+  const currentKm = vehicle?.currentKm || 0;
+  const reserveStartKm = vehicle?.reserveStartKm || 0;
+  const reserveActive = !!vehicle?.reserveActive && reserveStartKm > 0;
 
   // Cálculos de Autonomia da Reserva
   const reserveAutonomyKm = reserveLitres * avgConsumption;
@@ -87,8 +85,8 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
 
   // --- Efeito para Rastreamento GPS Nativo ---
   useEffect(() => {
-    // Se a reserva não estiver ativa ou o GPS estiver desligado pelo usuário, interrompe o rastreamento
-    if (!reserveActive || !isGpsActive) {
+    // Se o veículo não estiver carregado, a reserva não estiver ativa ou o GPS estiver desligado, interrompe o rastreamento
+    if (!vehicle || !reserveActive || !isGpsActive) {
       if (watchIdRef.current !== null && typeof window !== 'undefined' && navigator.geolocation) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
@@ -271,6 +269,8 @@ export default function FuelReserveCard({ vehicle, onUpdateVehicle }: FuelReserv
       reserveStartKm: 0
     });
   };
+
+  if (!vehicle) return null;
 
   return (
     <div className="reserve-card card glass">
