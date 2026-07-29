@@ -189,60 +189,78 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    Object.values(weekdaySummary).forEach(w => {
-      w.faturamentoTotal = Number(w.faturamentoTotal.toFixed(2));
-      w.lucroTotal = Number(w.lucroTotal.toFixed(2));
-      w.kmTotal = Number(w.kmTotal.toFixed(1));
-      w.horasTrabalhadas = Number(w.horasTrabalhadas.toFixed(1));
-      w.ganhoMedioPorHora = w.horasTrabalhadas > 0 ? Number((w.faturamentoTotal / w.horasTrabalhadas).toFixed(2)) : 0;
-      w.lucroMedioPorKm = w.kmTotal > 0 ? Number((w.lucroTotal / w.kmTotal).toFixed(2)) : 0;
+    const monthlyList = Object.values(monthlySummary).map(m => {
+      const faturamentoNum = Number(m.faturamento.toFixed(2));
+      const lucroNum = Number(m.lucroLiquido.toFixed(2));
+      const combustivelNum = Number(m.combustivelGasto.toFixed(2));
+      const kmNum = Number(m.kmTotal.toFixed(1));
+      const horasNum = Number(m.horasTrabalhadas.toFixed(1));
+      const lucroKm = kmNum > 0 ? Number((lucroNum / kmNum).toFixed(2)) : 0;
+      const lucroHora = horasNum > 0 ? Number((lucroNum / horasNum).toFixed(2)) : 0;
+
+      return {
+        mes: m.mes,
+        faturamento_formatado: `R$ ${faturamentoNum.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        lucro_liquido_formatado: `R$ ${lucroNum.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        combustivel_gasto_formatado: `R$ ${combustivelNum.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        km_total_formatado: `${kmNum.toLocaleString('pt-BR')} km`,
+        corridas: m.corridas,
+        horas_trabalhadas_formatado: `${horasNum.toLocaleString('pt-BR')} horas`,
+        lucro_por_km_formatado: `R$ ${lucroKm.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/km`,
+        lucro_por_hora_formatado: `R$ ${lucroHora.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/h`
+      };
     });
 
-    // Formatando valores nos resumos mensais
-    Object.values(monthlySummary).forEach(m => {
-      m.faturamento = Number(m.faturamento.toFixed(2));
-      m.lucroLiquido = Number(m.lucroLiquido.toFixed(2));
-      m.combustivelGasto = Number(m.combustivelGasto.toFixed(2));
-      m.kmTotal = Number(m.kmTotal.toFixed(1));
-      m.horasTrabalhadas = Number(m.horasTrabalhadas.toFixed(1));
-      m.rendimentoKmL = Number(vehicleAvgConsumption.toFixed(1));
-      m.lucroPorKm = m.kmTotal > 0 ? Number((m.lucroLiquido / m.kmTotal).toFixed(2)) : 0;
-      m.lucroPorHora = m.horasTrabalhadas > 0 ? Number((m.lucroLiquido / m.horasTrabalhadas).toFixed(2)) : 0;
+    const weekdayList = Object.values(weekdaySummary).map(w => {
+      const fatNum = Number(w.faturamentoTotal.toFixed(2));
+      const lucroNum = Number(w.lucroTotal.toFixed(2));
+      const kmNum = Number(w.kmTotal.toFixed(1));
+      const horasNum = Number(w.horasTrabalhadas.toFixed(1));
+      const ganhoHora = horasNum > 0 ? Number((fatNum / horasNum).toFixed(2)) : 0;
+      const lucroKm = kmNum > 0 ? Number((lucroNum / kmNum).toFixed(2)) : 0;
+
+      return {
+        dia_da_semana: w.dia,
+        faturamento_total_formatado: `R$ ${fatNum.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        lucro_total_formatado: `R$ ${lucroNum.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        km_total_formatado: `${kmNum.toLocaleString('pt-BR')} km`,
+        horas_trabalhadas_formatado: `${horasNum.toLocaleString('pt-BR')} horas`,
+        turnos_realizados: w.turnosCount,
+        ganho_medio_por_hora_formatado: `R$ ${ganhoHora.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/hora`,
+        lucro_medio_por_km_formatado: `R$ ${lucroKm.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/km`
+      };
     });
 
     const systemPrompt = `
       Você é a "Assistente de Bordo" da Auto Control, uma parceira inteligente, especialista e encorajadora para motoristas de aplicativo.
       Seu objetivo é analisar o desempenho financeiro e operacional do motorista e responder com precisão sobre faturamento, lucro, corridas, km e rendimento.
 
-      TONALIDADE:
-      - Seja calorosa, parceira, profissional e direta.
-      - Sempre formate valores monetários no padrão de moeda brasileiro (R$ XX,XX).
-      - Responda sempre em Português do Brasil.
-      - Use formatação Markdown (títulos, negritos e listas de marcadores) para respostas fáceis de ler no celular.
+      REGRAS RÍGIDAS DE FORMATAÇÃO E VALORES:
+      1. NUNCA invente, recalcule ou altere os valores financeiros. Copie EXATAMENTE a string pré-formatada fornecida nos dados (ex: use "R$ 3.232,83", "R$ 2.522,33").
+      2. NUNCA utilize tabelas com marcadores de tubo (ex: NUNCA use "| Mês | Faturamento |"). Em vez de tabelas, apresente os dados SEMPRE em tópicos com marcadores e negrito (ex: "- **Julho de 2026:** Faturamento de R$ 3.232,83...").
+      3. Responda sempre em Português do Brasil de forma clara, motivadora e limpa.
 
       INFORMAÇÕES DO VEÍCULO:
       - Modelo: ${vehicle?.model || 'Não cadastrado'}
       - Consumo Médio Calculado/Real: ${vehicleAvgConsumption.toFixed(1)} km/L
 
-      RESUMO CONSOLIDADO POR MÊS DE TODO O HISTÓRICO DO MOTORISTA:
-      ${JSON.stringify(Object.values(monthlySummary), null, 2)}
+      RESUMO CONSOLIDADO POR MÊS (USAR ESTES VALORES EXATOS):
+      ${JSON.stringify(monthlyList, null, 2)}
 
-      RESUMO DE RENTABILIDADE POR DIA DA SEMANA (DOMINGO A SÁBADO):
-      ${JSON.stringify(Object.values(weekdaySummary), null, 2)}
+      RENTABILIDADE POR DIA DA SEMANA (USAR ESTES VALORES EXATOS):
+      ${JSON.stringify(weekdayList, null, 2)}
 
       REGISTROS DETALHADOS DAS CORRIDAS DO MOTORISTA:
       ${JSON.stringify(detailedRides.slice(0, 60), null, 2)}
 
       SUAS CAPACIDADES E INSTRUÇÕES PRINCIPAIS:
       1. SUGESTÃO DE DIAS E HORÁRIOS MAIS RENTÁVEIS:
-         - Ao ser perguntado sobre quais são os melhores dias ou horários para rodar, analise os dados de 'RESUMO DE RENTABILIDADE POR DIA DA SEMANA'.
-         - Identifique e indique os dias com maior Média R$/Hora (ganhoMedioPorHora) e maior faturamento.
-         - Forneça um ranking claro com os melhores dias (ex: 1º Sexta-feira, 2º Sábado, etc.) explicando os valores e recomendando focar neles.
+         - Ao ser perguntado sobre quais são os melhores dias ou horários para rodar, consulte a lista 'RENTABILIDADE POR DIA DA SEMANA'.
+         - Destaque o ranking dos dias com maior ganho por hora (ex: "1º Sexta-feira com ganho médio de R$ XX,XX/hora...").
       2. DICAS PRÁTICAS DE ECONOMIA DE COMBUSTÍVEL E AUMENTO DE LUCRO:
-         - Sugira práticas comprovadas para economizar combustível (manter velocidade constante entre 60-80 km/h, recalibrar pneus semanalmente, reduzir tempo do motor em marcha lenta e otimizar rotas sem rodar "vazio").
-         - Oriente estratégias para elevar o Lucro por KM (R$/km) acima de R$ 2,00/km.
+         - Dê conselhos práticos para economizar combustível (manter velocidade entre 60-80 km/h, calibração semanal de pneus, evitar marchar lenta e rotas sem passageiro).
       3. RESUMOS MENSAIS E COMPARAÇÕES:
-         - Se o motorista perguntar sobre um mês específico (Maio, Junho, Julho, etc.), dê os valores exatos de faturamento, lucro líquido, km e horas daquele mês.
+         - Se o motorista perguntar sobre um mês específico (ex: Julho), informe exatamente o faturamento_formatado ("R$ 3.232,83") e lucro_liquido_formatado ("R$ 2.522,33").
     `;
 
     const chatCompletion = await groq.chat.completions.create({

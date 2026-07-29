@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, X, Sparkles, Send, Mic, Trash2, Loader2, Volume2, Square, RotateCcw, History, Plus, MessageSquare, ChevronRight } from 'lucide-react';
+import { Bot, X, Sparkles, Send, Mic, Trash2, Loader2, Volume2, Square, RotateCcw, History, Plus, MessageSquare } from 'lucide-react';
 
 export default function AIAssistant() {
   const [showAIChat, setShowAIChat] = useState(false);
@@ -138,13 +138,6 @@ export default function AIAssistant() {
     localStorage.setItem('autocontrol_ai_chat_sessions', JSON.stringify(updated));
   };
 
-  const handleClearCurrent = () => {
-    if (confirm('Deseja realmente limpar a conversa atual?')) {
-      setChatHistory([]);
-      localStorage.removeItem('autocontrol_ai_current_chat');
-    }
-  };
-
   const speakMessage = (text: string, msgId: string) => {
     if (!('speechSynthesis' in window)) return;
     if (isSpeaking === msgId) {
@@ -169,7 +162,15 @@ export default function AIAssistant() {
   const renderFormattedContent = (content: string) => {
     const lines = content.split('\n');
     return lines.map((line, idx) => {
-      const parts = line.split(/(\*\*.*?\*\*)/g);
+      let trimmed = line.trim();
+      let isBullet = false;
+      
+      if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+        trimmed = trimmed.slice(2);
+        isBullet = true;
+      }
+
+      const parts = trimmed.split(/(\*\*.*?\*\*)/g);
       const formattedLine = parts.map((part, pIdx) => {
         if (part.startsWith('**') && part.endsWith('**')) {
           return <strong key={pIdx}>{part.slice(2, -2)}</strong>;
@@ -179,8 +180,15 @@ export default function AIAssistant() {
 
       return (
         <React.Fragment key={idx}>
-          {formattedLine}
-          {idx < lines.length - 1 && <br />}
+          {isBullet ? (
+            <div style={{ display: 'flex', gap: '6px', marginLeft: '4px', margin: '2px 0' }}>
+              <span style={{ color: '#2563eb', fontWeight: 'bold' }}>•</span>
+              <div>{formattedLine}</div>
+            </div>
+          ) : (
+            <div>{formattedLine}</div>
+          )}
+          {idx < lines.length - 1 && !isBullet && <div style={{ height: '4px' }} />}
         </React.Fragment>
       );
     });
@@ -192,10 +200,10 @@ export default function AIAssistant() {
         {showAIChat && (
           <div className="ai-modal-overlay">
             <motion.div 
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
               className="ai-chat-drawer"
             >
               {/* Cabeçalho Fixo */}
@@ -383,27 +391,34 @@ export default function AIAssistant() {
       <style jsx>{`
         .ai-modal-overlay {
           position: fixed;
-          inset: 0;
-          background: rgba(15, 23, 42, 0.6);
-          backdrop-filter: blur(8px);
-          z-index: 9999;
-          display: flex;
-          justify-content: center;
-          align-items: flex-end;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100vw;
           height: 100dvh;
+          background: rgba(15, 23, 42, 0.5);
+          backdrop-filter: blur(8px);
+          z-index: 99999;
+          display: flex;
+          justify-content: flex-end;
+          align-items: flex-end;
+          padding: 24px;
+          box-sizing: border-box;
         }
 
         .ai-chat-drawer {
-          width: 100%;
-          max-width: 500px;
-          height: 85vh;
-          max-height: 750px;
+          width: 440px;
+          max-width: calc(100vw - 48px);
+          height: 650px;
+          max-height: calc(100dvh - 48px);
           background: #ffffff;
-          border-radius: 24px 24px 0 0;
+          border-radius: 20px;
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+          border: 1px solid #e2e8f0;
           position: relative;
         }
 
@@ -616,7 +631,7 @@ export default function AIAssistant() {
           background: #eff6ff;
         }
 
-        .chat-bubble-container { display: flex; gap: 8px; max-width: 88%; }
+        .chat-bubble-container { display: flex; gap: 8px; max-width: 90%; }
         .chat-bubble-container.user { align-self: flex-end; flex-direction: row-reverse; }
         .chat-bubble-container.assistant { align-self: flex-start; }
 
@@ -693,23 +708,34 @@ export default function AIAssistant() {
         }
 
         @media (max-width: 640px) {
+          .ai-modal-overlay {
+            padding: 0;
+            align-items: flex-end;
+          }
           .ai-chat-drawer { 
             height: 100dvh; 
             max-height: 100dvh; 
             width: 100vw;
+            max-width: 100vw;
             border-radius: 0; 
+            border: none;
           }
           .ai-chat-header {
-            padding: 14px 16px;
+            padding-top: max(16px, env(safe-area-inset-top, 16px));
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-bottom: 14px;
           }
           .ai-chat-messages {
             padding: 14px 16px;
           }
           .ai-chat-input { 
-            padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px)) 14px; 
+            padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+            padding-left: 14px;
+            padding-right: 14px;
           }
           .chat-bubble-container {
-            max-width: 92%;
+            max-width: 95%;
           }
         }
       `}</style>
