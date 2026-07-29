@@ -13,6 +13,13 @@ export async function PUT(
     const body = await request.json();
     const { id } = await params;
 
+    // Remover campos imutáveis do MongoDB para evitar erro no findByIdAndUpdate
+    delete body._id;
+    delete body.id;
+    delete body.__v;
+    delete body.createdAt;
+    delete body.updatedAt;
+
     if (body.startTime) body.startTime = localInputValueToDate(body.startTime);
     if (body.endTime) body.endTime = localInputValueToDate(body.endTime);
     if (body.date) body.date = localInputValueToDate(body.date || body.startTime);
