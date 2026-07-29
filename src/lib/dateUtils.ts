@@ -6,9 +6,16 @@
 /**
  * Converte um objeto Date, timestamp ou string ISO para a string de entrada do HTML <input type="datetime-local"> ("YYYY-MM-DDTHH:mm")
  * utilizando estritamente o fuso horário de Brasília (America/Sao_Paulo).
+ * Preserva strings no formato "YYYY-MM-DDTHH:mm" intactas quando o usuário está digitando no input.
  */
 export function dateToLocalInputValue(dateInput: Date | string | number = new Date()): string {
   if (!dateInput) return '';
+  
+  // Se já for uma string datetime-local padrão ("YYYY-MM-DDTHH:mm"), mantém intacta para digitação fluida do usuário
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateInput)) {
+    return dateInput;
+  }
+
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   if (isNaN(date.getTime())) return '';
 
@@ -40,7 +47,7 @@ export function dateToLocalInputValue(dateInput: Date | string | number = new Da
 
 /**
  * Converte o valor de um input datetime-local ("YYYY-MM-DDTHH:mm") ou ISO string para um objeto Date garantindo a marcação do fuso de Brasília (-03:00).
- * Função 100% idempotente (não desloca horas se chamada repetidamente).
+ * Função 100% idempotente.
  */
 export function localInputValueToDate(inputValue: string | Date): Date {
   if (!inputValue) return new Date();
