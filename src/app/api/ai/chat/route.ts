@@ -130,6 +130,74 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // Agrupamento por Dia da Semana (Domingo a Sábado)
+    const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const weekdaySummary: Record<string, {
+      dia: string;
+      faturamentoTotal: number;
+      lucroTotal: number;
+      kmTotal: number;
+      horasTrabalhadas: number;
+      turnosCount: number;
+      ganhoMedioPorHora: number;
+      lucroMedioPorKm: number;
+    }> = {};
+
+    dayNames.forEach(d => {
+      weekdaySummary[d] = {
+        dia: d,
+        faturamentoTotal: 0,
+        lucroTotal: 0,
+        kmTotal: 0,
+        horasTrabalhadas: 0,
+        turnosCount: 0,
+        ganhoMedioPorHora: 0,
+        lucroMedioPorKm: 0
+      };
+    });
+
+    rides.forEach(r => {
+      if (r.platform === 'Passeio') return;
+      const d = new Date(r.startTime || r.date || r.createdAt);
+      const dayName = dayNames[d.getDay()];
+      
+      const kmTotal = r.kmTotal || 0;
+      let rideFuelPrice = avgFuelPrice;
+      const rideFuelCost = r.fuelings?.reduce((acc: number, f: any) => acc + (f.cost || 0), 0) || 0;
+      const rideFuelLitres = r.fuelings?.reduce((acc: number, f: any) => acc + (f.litres || 0), 0) || 0;
+      if (rideFuelLitres > 0) rideFuelPrice = rideFuelCost / rideFuelLitres;
+      const fuelCostConsumed = (kmTotal / vehicleAvgConsumption) * rideFuelPrice;
+      const lucro = (r.earnings || 0) - fuelCostConsumed;
+
+      let diffHours = 0;
+      if (r.startTime && r.endTime) {
+        const totalDiffMs = new Date(r.endTime).getTime() - new Date(r.startTime).getTime();
+        const totalPauseMs = (r.pauses || []).reduce((acc: number, p: any) => {
+          const pStart = new Date(p.startTime).getTime();
+          const pEnd = p.endTime ? new Date(p.endTime).getTime() : pStart;
+          return acc + Math.max(0, pEnd - pStart);
+        }, 0);
+        diffHours = Math.max(0, (totalDiffMs - totalPauseMs)) / (1000 * 60 * 60);
+      }
+
+      if (weekdaySummary[dayName]) {
+        weekdaySummary[dayName].faturamentoTotal += (r.earnings || 0);
+        weekdaySummary[dayName].lucroTotal += lucro;
+        weekdaySummary[dayName].kmTotal += kmTotal;
+        weekdaySummary[dayName].horasTrabalhadas += diffHours;
+        weekdaySummary[dayName].turnosCount += 1;
+      }
+    });
+
+    Object.values(weekdaySummary).forEach(w => {
+      w.faturamentoTotal = Number(w.faturamentoTotal.toFixed(2));
+      w.lucroTotal = Number(w.lucroTotal.toFixed(2));
+      w.kmTotal = Number(w.kmTotal.toFixed(1));
+      w.horasTrabalhadas = Number(w.horasTrabalhadas.toFixed(1));
+      w.ganhoMedioPorHora = w.horasTrabalhadas > 0 ? Number((w.faturamentoTotal / w.horasTrabalhadas).toFixed(2)) : 0;
+      w.lucroMedioPorKm = w.kmTotal > 0 ? Number((w.lucroTotal / w.kmTotal).toFixed(2)) : 0;
+    });
+
     // Formatando valores nos resumos mensais
     Object.values(monthlySummary).forEach(m => {
       m.faturamento = Number(m.faturamento.toFixed(2));
@@ -143,13 +211,14 @@ export async function POST(request: NextRequest) {
     });
 
     const systemPrompt = `
-      Você é a "Assistente de Bordo" da Auto Control, uma parceira inteligente e encorajadora para motoristas de aplicativo.
-      Seu objetivo é analisar o desempenho financeiro e operacional do motorista e responder com precisão a qualquer pergunta sobre seus registros de faturamento, lucro, corridas, km e rendimento (incluindo Maio, Junho, Julho e qualquer outro mês cadastrado).
+      Você é a "Assistente de Bordo" da Auto Control, uma parceira inteligente, especialista e encorajadora para motoristas de aplicativo.
+      Seu objetivo é analisar o desempenho financeiro e operacional do motorista e responder com precisão sobre faturamento, lucro, corridas, km e rendimento.
 
       TONALIDADE:
       - Seja calorosa, parceira, profissional e direta.
       - Sempre formate valores monetários no padrão de moeda brasileiro (R$ XX,XX).
       - Responda sempre em Português do Brasil.
+      - Use formatação Markdown (títulos, negritos e listas de marcadores) para respostas fáceis de ler no celular.
 
       INFORMAÇÕES DO VEÍCULO:
       - Modelo: ${vehicle?.model || 'Não cadastrado'}
@@ -158,13 +227,22 @@ export async function POST(request: NextRequest) {
       RESUMO CONSOLIDADO POR MÊS DE TODO O HISTÓRICO DO MOTORISTA:
       ${JSON.stringify(Object.values(monthlySummary), null, 2)}
 
+      RESUMO DE RENTABILIDADE POR DIA DA SEMANA (DOMINGO A SÁBADO):
+      ${JSON.stringify(Object.values(weekdaySummary), null, 2)}
+
       REGISTROS DETALHADOS DAS CORRIDAS DO MOTORISTA:
       ${JSON.stringify(detailedRides.slice(0, 60), null, 2)}
 
-      DIRETRIZES:
-      1. Use os dados consolidados do resumo mensal para responder sobre qualquer mês específico (ex: Maio, Junho, etc.) ou fazer comparações entre meses.
-      2. Se o motorista perguntar sobre o desempenho de um mês em específico, informe os valores exatos de faturamento, lucro líquido, km e rendimento daquele mês.
-      3. Sempre motive o motorista com dicas práticas baseadas no seu rendimento (R$/km e R$/h).
+      SUAS CAPACIDADES E INSTRUÇÕES PRINCIPAIS:
+      1. SUGESTÃO DE DIAS E HORÁRIOS MAIS RENTÁVEIS:
+         - Ao ser perguntado sobre quais são os melhores dias ou horários para rodar, analise os dados de 'RESUMO DE RENTABILIDADE POR DIA DA SEMANA'.
+         - Identifique e indique os dias com maior Média R$/Hora (ganhoMedioPorHora) e maior faturamento.
+         - Forneça um ranking claro com os melhores dias (ex: 1º Sexta-feira, 2º Sábado, etc.) explicando os valores e recomendando focar neles.
+      2. DICAS PRÁTICAS DE ECONOMIA DE COMBUSTÍVEL E AUMENTO DE LUCRO:
+         - Sugira práticas comprovadas para economizar combustível (manter velocidade constante entre 60-80 km/h, recalibrar pneus semanalmente, reduzir tempo do motor em marcha lenta e otimizar rotas sem rodar "vazio").
+         - Oriente estratégias para elevar o Lucro por KM (R$/km) acima de R$ 2,00/km.
+      3. RESUMOS MENSAIS E COMPARAÇÕES:
+         - Se o motorista perguntar sobre um mês específico (Maio, Junho, Julho, etc.), dê os valores exatos de faturamento, lucro líquido, km e horas daquele mês.
     `;
 
     const chatCompletion = await groq.chat.completions.create({
