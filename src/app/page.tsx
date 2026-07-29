@@ -388,14 +388,23 @@ export default function Dashboard() {
   // Custo estimado de combustível para a distância percorrida no período
   const estimatedFuelCost = totalKm > 0 ? (totalKm / realAvgConsumptionNum) * avgFuelPrice : 0;
   
-  // Cálculo de carga horária acumulada no período filtrado (subtraindo pausas)
+  // Cálculo de carga horária acumulada no período filtrado (subtraindo pausas e resolvendo fallbacks de término)
   const totalMinutes = filteredRides.reduce((acc, curr) => {
     const sVal = curr.startTime || curr.date || curr.createdAt;
-    const eVal = curr.endTime || curr.date || curr.createdAt;
+    
+    let eVal = curr.endTime;
+    if (!eVal && curr.pauses && curr.pauses.length > 0) {
+      const lastP = curr.pauses[curr.pauses.length - 1];
+      eVal = lastP.endTime || lastP.startTime;
+    }
+    if (!eVal) {
+      eVal = curr.updatedAt || curr.createdAt;
+    }
+
     if (sVal && eVal) {
       const startMs = new Date(sVal).getTime();
       const endMs = new Date(eVal).getTime();
-      if (!isNaN(startMs) && !isNaN(endMs) && endMs >= startMs) {
+      if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
         const totalDiffMs = endMs - startMs;
         const totalPauseMs = (curr.pauses || []).reduce((pAcc: number, p: any) => {
           if (!p.startTime) return pAcc;

@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
     if (body.action === 'finish') {
       const kmEnd = body.kmEnd;
       const kmTotal = kmEnd - activeSession.kmStart;
-      const endTimeVal = parseDateInput(body.endTime);
+      const endTimeVal = (body.endTime && String(body.endTime).trim()) ? parseDateInput(body.endTime) : new Date();
       
       // Se estava em pausa ao fechar, fecha a última pausa
       if (activeSession.status === 'paused' && activeSession.pauses && activeSession.pauses.length > 0) {
