@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, X, Sparkles, Send, Mic, Trash2, Loader2, Volume2, Square, RotateCcw, History, Plus, MessageSquare } from 'lucide-react';
+import { Bot, X, Sparkles, Send, Mic, Trash2, Loader2, Volume2, Square, History, Plus, MessageSquare } from 'lucide-react';
 
 export default function AIAssistant() {
   const [showAIChat, setShowAIChat] = useState(false);
@@ -15,30 +15,29 @@ export default function AIAssistant() {
   const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Escutar evento global para abrir o chat e travar scroll da página
-  useEffect(() => {
-    const handleOpenAI = () => {
-      setShowAIChat(true);
-      document.body.style.overflow = 'hidden';
+  // Arquivar sessão atual no histórico
+  const archiveCurrentSession = (messagesToArchive: any[]) => {
+    if (!messagesToArchive || messagesToArchive.length === 0) return;
+    const firstUserMsg = messagesToArchive.find(m => m.role === 'user')?.content || 'Conversa';
+    const title = firstUserMsg.length > 30 ? firstUserMsg.slice(0, 30) + '...' : firstUserMsg;
+    const newSession = {
+      id: Date.now().toString(),
+      title,
+      date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+      messages: messagesToArchive
     };
-    const handleCloseAI = () => {
-      setShowAIChat(false);
-      document.body.style.overflow = 'auto';
-    };
-    window.addEventListener('open-ai-assistant', handleOpenAI);
-    return () => {
-      window.removeEventListener('open-ai-assistant', handleOpenAI);
-      document.body.style.overflow = 'auto';
-    };
-  }, []);
+    
+    setSavedSessions(prev => {
+      if (prev.some(s => s.id === newSession.id)) return prev;
+      const updated = [newSession, ...prev];
+      localStorage.setItem('autocontrol_ai_chat_sessions', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
-  // Carregar histórico e conversas salvas do localStorage
+  // Carregar histórico do localStorage
   useEffect(() => {
     try {
-      const storedCurrent = localStorage.getItem('autocontrol_ai_current_chat');
-      if (storedCurrent) {
-        setChatHistory(JSON.parse(storedCurrent));
-      }
       const storedSessions = localStorage.getItem('autocontrol_ai_chat_sessions');
       if (storedSessions) {
         setSavedSessions(JSON.parse(storedSessions));
@@ -48,10 +47,36 @@ export default function AIAssistant() {
     }
   }, []);
 
-  // Salvar conversa atual no localStorage e rolar para o fim
+  // Escutar evento global para abrir o chat sempre com UMA CONVERSA NOVA/LIMPA
+  useEffect(() => {
+    const handleOpenAI = () => {
+      setShowAIChat(true);
+      setShowHistoryPanel(false);
+      setChatHistory(prev => {
+        if (prev.length > 0) {
+          archiveCurrentSession(prev);
+        }
+        return [];
+      });
+      localStorage.removeItem('autocontrol_ai_current_chat');
+      document.body.style.overflow = 'hidden';
+    };
+    
+    const handleCloseAI = () => {
+      setShowAIChat(false);
+      document.body.style.overflow = 'auto';
+    };
+
+    window.addEventListener('open-ai-assistant', handleOpenAI);
+    return () => {
+      window.removeEventListener('open-ai-assistant', handleOpenAI);
+      document.body.style.overflow = 'auto';
+    };
+  }, []);
+
+  // Rolar para o fim quando houver nova mensagem
   useEffect(() => {
     if (chatHistory.length > 0) {
-      localStorage.setItem('autocontrol_ai_current_chat', JSON.stringify(chatHistory));
       scrollToBottom();
     }
   }, [chatHistory, aiLoading]);
@@ -109,17 +134,7 @@ export default function AIAssistant() {
 
   const handleNewChat = () => {
     if (chatHistory.length > 0) {
-      const firstUserMsg = chatHistory.find(m => m.role === 'user')?.content || 'Conversa sem título';
-      const title = firstUserMsg.length > 35 ? firstUserMsg.slice(0, 35) + '...' : firstUserMsg;
-      const newSession = {
-        id: Date.now().toString(),
-        title,
-        date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
-        messages: chatHistory
-      };
-      const updatedSessions = [newSession, ...savedSessions];
-      setSavedSessions(updatedSessions);
-      localStorage.setItem('autocontrol_ai_chat_sessions', JSON.stringify(updatedSessions));
+      archiveCurrentSession(chatHistory);
     }
     setChatHistory([]);
     localStorage.removeItem('autocontrol_ai_current_chat');
@@ -127,6 +142,9 @@ export default function AIAssistant() {
   };
 
   const handleLoadSession = (session: any) => {
+    if (chatHistory.length > 0) {
+      archiveCurrentSession(chatHistory);
+    }
     setChatHistory(session.messages);
     setShowHistoryPanel(false);
   };
@@ -181,14 +199,14 @@ export default function AIAssistant() {
       return (
         <React.Fragment key={idx}>
           {isBullet ? (
-            <div style={{ display: 'flex', gap: '6px', marginLeft: '4px', margin: '2px 0' }}>
+            <div style={{ display: 'flex', gap: '6px', marginLeft: '2px', margin: '2px 0' }}>
               <span style={{ color: '#2563eb', fontWeight: 'bold' }}>•</span>
               <div>{formattedLine}</div>
             </div>
           ) : (
             <div>{formattedLine}</div>
           )}
-          {idx < lines.length - 1 && !isBullet && <div style={{ height: '4px' }} />}
+          {idx < lines.length - 1 && !isBullet && <div style={{ height: '3px' }} />}
         </React.Fragment>
       );
     });
@@ -203,13 +221,13 @@ export default function AIAssistant() {
               initial={{ y: '100%', opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 240 }}
               className="ai-chat-drawer"
             >
               {/* Cabeçalho Fixo */}
               <div className="ai-chat-header">
                 <div className="ai-title">
-                  <div className="ai-icon-pulse"><Bot size={20} /></div>
+                  <div className="ai-icon-pulse"><Bot size={18} /></div>
                   <div>
                     <h3>Assistente de Bordo</h3>
                     <span className="online-status">Ativa agora</span>
@@ -222,7 +240,7 @@ export default function AIAssistant() {
                     onClick={() => setShowHistoryPanel(!showHistoryPanel)}
                     title="Histórico de Conversas"
                   >
-                    <History size={18} />
+                    <History size={16} />
                   </button>
                   
                   <button 
@@ -230,7 +248,7 @@ export default function AIAssistant() {
                     onClick={handleNewChat}
                     title="Nova Conversa"
                   >
-                    <Plus size={18} />
+                    <Plus size={16} />
                   </button>
 
                   <button 
@@ -241,7 +259,7 @@ export default function AIAssistant() {
                     className="close-ai"
                     title="Fechar"
                   >
-                    <X size={20} />
+                    <X size={18} />
                   </button>
                 </div>
               </div>
@@ -262,7 +280,7 @@ export default function AIAssistant() {
 
                     <div className="history-list">
                       <button className="new-session-item" onClick={handleNewChat}>
-                        <Plus size={16} /> Nova Conversa
+                        <Plus size={14} /> Nova Conversa
                       </button>
 
                       {savedSessions.length === 0 ? (
@@ -286,7 +304,7 @@ export default function AIAssistant() {
                               onClick={(e) => handleDeleteSession(session.id, e)}
                               title="Excluir conversa"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         ))
@@ -300,19 +318,19 @@ export default function AIAssistant() {
               <div className="ai-chat-messages">
                 {chatHistory.length === 0 && (
                   <div className="ai-welcome">
-                    <Sparkles size={40} style={{ color: 'var(--primary)' }} />
+                    <Sparkles size={32} style={{ color: '#2563eb' }} />
                     <h4>Como posso ajudar hoje?</h4>
-                    <p>Pergunte sobre seus melhores dias, dicas de economia de combustível ou estratégias para aumentar o lucro por km!</p>
+                    <p>Pergunte sobre seus dias mais rentáveis, dicas de economia ou aumento de lucro por km!</p>
                     
                     <div className="prompt-suggestions">
                       <button onClick={() => handleSendMessageDirect("Quais são meus dias e horários mais rentáveis?")}>
-                        🗓️ Quais meus dias mais rentáveis?
+                        🗓️ Melhores dias para rodar
                       </button>
                       <button onClick={() => handleSendMessageDirect("Como posso economizar combustível com meu veículo?")}>
                         ⛽ Dicas para economizar combustível
                       </button>
                       <button onClick={() => handleSendMessageDirect("Qual é a minha média de lucro por km?")}>
-                        📈 Como aumentar meu lucro por KM?
+                        📈 Aumentar lucro por KM
                       </button>
                     </div>
                   </div>
@@ -329,7 +347,7 @@ export default function AIAssistant() {
                         onClick={() => speakMessage(msg.content, `msg-${i}`)}
                         title="Ouvir resposta"
                       >
-                        {isSpeaking === `msg-${i}` ? <Square size={14} fill="currentColor" /> : <Volume2 size={14} />}
+                        {isSpeaking === `msg-${i}` ? <Square size={13} fill="currentColor" /> : <Volume2 size={13} />}
                       </button>
                     )}
                   </div>
@@ -337,7 +355,7 @@ export default function AIAssistant() {
                 
                 {aiLoading && (
                   <div className="chat-bubble assistant loading">
-                    <Loader2 className="animate-spin" size={14} /> Analisando seu histórico de corridas...
+                    <Loader2 className="animate-spin" size={14} /> Analisando suas corridas...
                   </div>
                 )}
 
@@ -348,7 +366,7 @@ export default function AIAssistant() {
               <form className="ai-chat-input" onSubmit={(e) => { e.preventDefault(); handleSendMessageDirect(aiMessage); }}>
                 {isAiListening && (
                   <button type="button" className="delete-voice-btn" onClick={() => { setIsAiListening(false); setAiMessage(''); }}>
-                    <Trash2 size={20} />
+                    <Trash2 size={18} />
                   </button>
                 )}
 
@@ -373,12 +391,12 @@ export default function AIAssistant() {
                       }}
                       whileTap={{ scale: 0.9 }}
                     >
-                      <Mic size={20} />
+                      <Mic size={18} />
                     </motion.button>
                   )}
                   {(aiMessage.trim() || aiLoading) && (
                     <button type="submit" disabled={aiLoading || !aiMessage.trim()} className="send-btn-ai">
-                      {aiLoading ? <Loader2 className="animate-spin" size={18} /> : <Send size={20} />}
+                      {aiLoading ? <Loader2 className="animate-spin" size={16} /> : <Send size={18} />}
                     </button>
                   )}
                 </div>
@@ -397,33 +415,33 @@ export default function AIAssistant() {
           bottom: 0;
           width: 100vw;
           height: 100dvh;
-          background: rgba(15, 23, 42, 0.5);
-          backdrop-filter: blur(8px);
+          background: rgba(15, 23, 42, 0.3);
+          backdrop-filter: blur(4px);
           z-index: 99999;
           display: flex;
           justify-content: flex-end;
           align-items: flex-end;
-          padding: 24px;
+          padding: 20px;
           box-sizing: border-box;
         }
 
         .ai-chat-drawer {
-          width: 440px;
-          max-width: calc(100vw - 48px);
-          height: 650px;
-          max-height: calc(100dvh - 48px);
+          width: 380px;
+          max-width: calc(100vw - 32px);
+          height: 520px;
+          max-height: calc(100dvh - 40px);
           background: #ffffff;
           border-radius: 20px;
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+          box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
           border: 1px solid #e2e8f0;
           position: relative;
         }
 
         .ai-chat-header {
-          padding: 16px 20px;
+          padding: 12px 16px;
           background: #ffffff;
           border-bottom: 1px solid #e2e8f0;
           display: flex;
@@ -433,19 +451,19 @@ export default function AIAssistant() {
           z-index: 10;
         }
 
-        .ai-title { display: flex; align-items: center; gap: 12px; }
-        .ai-title h3 { font-size: 1rem; font-weight: 700; margin: 0; color: #1e293b; }
-        .online-status { font-size: 0.7rem; color: #10b981; font-weight: 600; }
+        .ai-title { display: flex; align-items: center; gap: 10px; }
+        .ai-title h3 { font-size: 0.95rem; font-weight: 700; margin: 0; color: #1e293b; }
+        .online-status { font-size: 0.65rem; color: #10b981; font-weight: 600; }
 
         .header-actions {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
         }
 
         .header-action-btn, .close-ai {
-          width: 36px;
-          height: 36px;
+          width: 32px;
+          height: 32px;
           border-radius: 50%;
           border: 1px solid #e2e8f0;
           background: #f8fafc;
@@ -466,8 +484,8 @@ export default function AIAssistant() {
         .history-panel {
           background: #ffffff;
           border-bottom: 1px solid #e2e8f0;
-          padding: 12px 16px;
-          max-height: 240px;
+          padding: 10px 14px;
+          max-height: 200px;
           overflow-y: auto;
           flex-shrink: 0;
         }
@@ -476,10 +494,10 @@ export default function AIAssistant() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           font-weight: 700;
           color: #64748b;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
           text-transform: uppercase;
         }
 
@@ -493,19 +511,19 @@ export default function AIAssistant() {
         .history-list {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 6px;
         }
 
         .new-session-item {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 8px 12px;
-          border-radius: 10px;
+          gap: 6px;
+          padding: 6px 10px;
+          border-radius: 8px;
           border: 1px dashed #cbd5e1;
           background: #f8fafc;
           color: #2563eb;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           font-weight: 700;
           cursor: pointer;
           width: 100%;
@@ -515,8 +533,8 @@ export default function AIAssistant() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 8px 12px;
-          border-radius: 10px;
+          padding: 6px 10px;
+          border-radius: 8px;
           background: #f1f5f9;
           cursor: pointer;
           transition: background 0.2s;
@@ -529,7 +547,7 @@ export default function AIAssistant() {
         .history-item-info {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
         }
 
         .history-item-icon {
@@ -537,7 +555,7 @@ export default function AIAssistant() {
         }
 
         .history-item-title {
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           font-weight: 600;
           color: #1e293b;
           margin: 0;
@@ -553,7 +571,7 @@ export default function AIAssistant() {
           border: none;
           color: #ef4444;
           cursor: pointer;
-          padding: 4px;
+          padding: 2px;
           opacity: 0.7;
         }
 
@@ -565,7 +583,7 @@ export default function AIAssistant() {
           font-size: 0.75rem;
           color: #94a3b8;
           text-align: center;
-          margin: 8px 0;
+          margin: 6px 0;
         }
 
         /* Messages Container */
@@ -574,32 +592,32 @@ export default function AIAssistant() {
           min-height: 0;
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
-          padding: 16px 20px;
+          padding: 14px 16px;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 12px;
           background: #f8fafc;
           overscroll-behavior: contain;
         }
 
         .ai-welcome {
           text-align: center;
-          padding: 20px 10px;
+          padding: 16px 8px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
         }
 
         .ai-welcome h4 {
-          font-size: 1.1rem;
+          font-size: 1rem;
           font-weight: 800;
           color: #0f172a;
           margin: 0;
         }
 
         .ai-welcome p {
-          font-size: 0.85rem;
+          font-size: 0.8rem;
           color: #64748b;
           margin: 0;
         }
@@ -607,18 +625,18 @@ export default function AIAssistant() {
         .prompt-suggestions {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 6px;
           width: 100%;
-          margin-top: 10px;
+          margin-top: 8px;
         }
 
         .prompt-suggestions button {
-          padding: 10px 14px;
-          border-radius: 12px;
+          padding: 8px 12px;
+          border-radius: 10px;
           border: 1px solid #e2e8f0;
           background: #ffffff;
           color: #334155;
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           font-weight: 600;
           text-align: left;
           cursor: pointer;
@@ -631,27 +649,27 @@ export default function AIAssistant() {
           background: #eff6ff;
         }
 
-        .chat-bubble-container { display: flex; gap: 8px; max-width: 90%; }
+        .chat-bubble-container { display: flex; gap: 6px; max-width: 90%; }
         .chat-bubble-container.user { align-self: flex-end; flex-direction: row-reverse; }
         .chat-bubble-container.assistant { align-self: flex-start; }
 
         .chat-bubble { 
-          padding: 12px 16px; 
-          border-radius: 18px; 
-          font-size: 0.9rem; 
-          line-height: 1.5; 
+          padding: 10px 14px; 
+          border-radius: 16px; 
+          font-size: 0.85rem; 
+          line-height: 1.45; 
           word-break: break-word;
         }
         .chat-bubble.user { background: #2563eb; color: white; border-bottom-right-radius: 4px; }
-        .chat-bubble.assistant { background: white; color: #1e293b; border-bottom-left-radius: 4px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+        .chat-bubble.assistant { background: white; color: #1e293b; border-bottom-left-radius: 4px; border: 1px solid #e2e8f0; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
 
         .ai-chat-input {
-          padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) 16px;
+          padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)) 14px;
           background: white;
           border-top: 1px solid #e2e8f0;
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
           flex-shrink: 0;
           z-index: 10;
         }
@@ -659,11 +677,11 @@ export default function AIAssistant() {
         .input-wrapper { flex: 1; }
         .input-wrapper input {
           width: 100%;
-          padding: 12px 16px;
+          padding: 10px 14px;
           background: #f1f5f9;
           border: 1px solid transparent;
-          border-radius: 20px;
-          font-size: 0.95rem;
+          border-radius: 18px;
+          font-size: 0.9rem;
           color: #1e293b;
           outline: none;
         }
@@ -674,8 +692,8 @@ export default function AIAssistant() {
         }
 
         .mic-btn-ai, .send-btn-ai, .delete-voice-btn {
-          width: 44px;
-          height: 44px;
+          width: 38px;
+          height: 38px;
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -694,8 +712,8 @@ export default function AIAssistant() {
 
         .speak-btn {
           margin-top: 4px;
-          width: 28px;
-          height: 28px;
+          width: 26px;
+          height: 26px;
           border-radius: 50%;
           border: 1px solid #e2e8f0;
           background: white;
@@ -711,31 +729,33 @@ export default function AIAssistant() {
           .ai-modal-overlay {
             padding: 0;
             align-items: flex-end;
+            background: rgba(15, 23, 42, 0.4);
           }
           .ai-chat-drawer { 
-            height: 100dvh; 
-            max-height: 100dvh; 
+            height: 80dvh; 
+            max-height: 80dvh; 
             width: 100vw;
             max-width: 100vw;
-            border-radius: 0; 
+            border-radius: 20px 20px 0 0; 
             border: none;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.25);
           }
           .ai-chat-header {
-            padding-top: max(16px, env(safe-area-inset-top, 16px));
+            padding-top: max(14px, env(safe-area-inset-top, 14px));
             padding-left: 16px;
             padding-right: 16px;
-            padding-bottom: 14px;
+            padding-bottom: 12px;
           }
           .ai-chat-messages {
-            padding: 14px 16px;
+            padding: 12px 14px;
           }
           .ai-chat-input { 
-            padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
-            padding-left: 14px;
-            padding-right: 14px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+            padding-left: 12px;
+            padding-right: 12px;
           }
           .chat-bubble-container {
-            max-width: 95%;
+            max-width: 92%;
           }
         }
       `}</style>
