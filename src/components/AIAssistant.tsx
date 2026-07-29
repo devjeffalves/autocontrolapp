@@ -216,14 +216,24 @@ export default function AIAssistant() {
     <>
       <AnimatePresence>
         {showAIChat && (
-          <div className="ai-modal-overlay">
+          <div 
+            className="ai-modal-overlay"
+            onClick={() => {
+              setShowAIChat(false);
+              document.body.style.overflow = 'auto';
+            }}
+          >
             <motion.div 
-              initial={{ y: 20, opacity: 0, scale: 0.96 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 20, opacity: 0, scale: 0.96 }}
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 280 }}
               className="ai-chat-drawer"
+              onClick={(e) => e.stopPropagation()}
             >
+              {/* Puxador Visual Mobile */}
+              <div className="mobile-drag-indicator" />
+
               {/* Cabeçalho Premium Dark Theme */}
               <div className="ai-chat-header">
                 <div className="ai-title">
@@ -426,6 +436,10 @@ export default function AIAssistant() {
           padding: 24px;
           box-sizing: border-box;
           pointer-events: none;
+        }
+
+        .mobile-drag-indicator {
+          display: none;
         }
 
         .ai-chat-drawer {
@@ -818,38 +832,54 @@ export default function AIAssistant() {
           background: #f1f5f9;
         }
 
-        /* Mobile Version: Gaveta inferior moderna (82dvh) */
+        /* Mobile Version: Gaveta inferior com área segura e proporção responsiva */
         @media (max-width: 640px) {
           .ai-modal-overlay {
             padding: 0;
             align-items: flex-end;
-            background: rgba(15, 23, 42, 0.35);
-            backdrop-filter: blur(6px);
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(8px);
             pointer-events: auto;
           }
+
+          .mobile-drag-indicator {
+            display: block;
+            width: 38px;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.3);
+            margin: 8px auto 2px auto;
+            flex-shrink: 0;
+          }
+
           .ai-chat-drawer { 
-            height: 82dvh; 
-            max-height: 82dvh; 
+            height: 85dvh; 
+            max-height: 85dvh; 
             width: 100vw;
             max-width: 100vw;
             border-radius: 24px 24px 0 0; 
             border: none;
-            box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.25);
+            box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.3);
+            background: #0f172a; /* Cor de fundo do cabeçalho para unificar o drag indicator */
           }
+
           .ai-chat-header {
-            padding-top: max(16px, env(safe-area-inset-top, 16px));
-            padding-left: 18px;
-            padding-right: 18px;
-            padding-bottom: 14px;
+            padding-top: max(8px, env(safe-area-inset-top, 8px));
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-bottom: 12px;
           }
+
           .ai-chat-messages {
             padding: 14px 16px;
           }
+
           .ai-chat-input { 
             padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
             padding-left: 14px;
             padding-right: 14px;
           }
+
           .chat-bubble-container {
             max-width: 92%;
           }
