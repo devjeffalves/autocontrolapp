@@ -231,55 +231,85 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    // Limitar history aos últimos 4 itens e podar mensagens antigas longas do assistente para não estourar limite de tokens
+    const prunedHistory = (history || []).slice(-4).map((h: any) => ({
+      role: h.role === 'user' ? 'user' : 'assistant',
+      content: h.role === 'user' 
+        ? String(h.content || '') 
+        : String(h.content || '').slice(0, 250) + (String(h.content || '').length > 250 ? '...' : '')
+    }));
+
+    // Minimizar token payload do system prompt
+    const compactRides = detailedRides.slice(0, 15).map(r => ({
+      d: r.data,
+      g: r.ganhos,
+      l: r.lucro,
+      k: r.km,
+      p: r.plataforma
+    }));
+
     const systemPrompt = `
-      Você é a "Assistente de Bordo" da Auto Control, uma parceira inteligente, especialista e encorajadora para motoristas de aplicativo.
-      Seu objetivo é analisar o desempenho financeiro e operacional do motorista e responder com precisão sobre faturamento, lucro, corridas, km e rendimento.
-
+      Você é a "Assistente de Bordo" da Auto Control, parceira inteligente de motoristas de aplicativo. Responda em Português do Brasil.
+      
       REGRAS RÍGIDAS DE FORMATAÇÃO E VALORES:
-      1. NUNCA invente, recalcule ou altere os valores financeiros. Copie EXATAMENTE a string pré-formatada fornecida nos dados (ex: use "R$ 3.232,83", "R$ 2.522,33").
-      2. NUNCA utilize tabelas com marcadores de tubo (ex: NUNCA use "| Mês | Faturamento |"). Em vez de tabelas, apresente os dados SEMPRE em tópicos com marcadores e negrito (ex: "- **Julho de 2026:** Faturamento de R$ 3.232,83...").
-      3. Responda sempre em Português do Brasil de forma clara, motivadora e limpa.
+      1. NUNCA altere os valores fornecidos. Copie EXATAMENTE a string pré-formatada (ex: "R$ 3.232,83").
+      2. NUNCA utilize tabelas em sintaxe de tubo markdown (| Mês | Faturamento |). Apresente SEMPRE em tópicos com marcadores.
+      3. Seja concisa, objetiva e direta para facilitar a leitura no celular.
 
-      INFORMAÇÕES DO VEÍCULO:
-      - Modelo: ${vehicle?.model || 'Não cadastrado'}
-      - Consumo Médio Calculado/Real: ${vehicleAvgConsumption.toFixed(1)} km/L
+      VEÍCULO: ${vehicle?.model || 'Não cadastrado'} (${vehicleAvgConsumption.toFixed(1)} km/L)
 
-      RESUMO CONSOLIDADO POR MÊS (USAR ESTES VALORES EXATOS):
-      ${JSON.stringify(monthlyList, null, 2)}
+      RESUMO MENSAL (USAR ESTES VALORES):
+      ${JSON.stringify(monthlyList)}
 
-      RENTABILIDADE POR DIA DA SEMANA (USAR ESTES VALORES EXATOS):
-      ${JSON.stringify(weekdayList, null, 2)}
+      RENTABILIDADE POR DIA (USAR ESTES VALORES):
+      ${JSON.stringify(weekdayList)}
 
-      REGISTROS DETALHADOS DAS CORRIDAS DO MOTORISTA:
-      ${JSON.stringify(detailedRides.slice(0, 60), null, 2)}
+      ÚLTIMAS CORRIDAS:
+      ${JSON.stringify(compactRides)}
 
       SUAS CAPACIDADES E INSTRUÇÕES PRINCIPAIS:
-      1. SUGESTÃO DE DIAS E HORÁRIOS MAIS RENTÁVEIS:
-         - Ao ser perguntado sobre quais são os melhores dias ou horários para rodar, consulte a lista 'RENTABILIDADE POR DIA DA SEMANA'.
-         - Destaque o ranking dos dias com maior ganho por hora (ex: "1º Sexta-feira com ganho médio de R$ XX,XX/hora...").
-      2. DICAS PRÁTICAS DE ECONOMIA DE COMBUSTÍVEL E AUMENTO DE LUCRO:
-         - Dê conselhos práticos para economizar combustível (manter velocidade entre 60-80 km/h, calibração semanal de pneus, evitar marchar lenta e rotas sem passageiro).
-      3. RESUMOS MENSAIS E COMPARAÇÕES:
-         - Se o motorista perguntar sobre um mês específico (ex: Julho), informe exatamente o faturamento_formatado ("R$ 3.232,83") e lucro_liquido_formatado ("R$ 2.522,33").
+      1. Indicar os melhores dias/horários com base na RENTABILIDADE POR DIA (maior ganho por hora em R$/h).
+      2. Dar dicas práticas de economia de combustível (velocidade constante 60-80 km/h, pneus calibrados, reduzir marcha lenta e rotas sem passageiro).
+      3. Informar faturamento/lucro exatos quando perguntado sobre um mês (ex: Julho: R$ 3.232,83).
     `;
 
-    const chatCompletion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...history.map((h: any) => ({
-          role: h.role === 'user' ? 'user' : 'assistant',
-          content: h.content
-        })),
-        { role: 'user', content: message }
-      ],
-      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-    });
+    const targetModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    let text = "";
 
-    const text = chatCompletion.choices[0]?.message?.content || "";
+    try {
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...prunedHistory,
+          { role: 'user', content: message }
+        ],
+        model: targetModel,
+      });
+      text = chatCompletion.choices[0]?.message?.content || "";
+    } catch (groqErr: any) {
+      console.warn("Primeira tentativa com Groq falhou, tentando fallback minimalista...", groqErr?.message);
+      try {
+        const fallbackCompletion = await groq.chat.completions.create({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: message }
+          ],
+          model: 'llama-3.3-70b-versatile',
+        });
+        text = fallbackCompletion.choices[0]?.message?.content || "";
+      } catch (fallbackErr: any) {
+        throw fallbackErr;
+      }
+    }
 
     return NextResponse.json({ success: true, text });
   } catch (error: any) {
     console.error('Erro no Groq:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    const isRateLimit = error?.status === 413 || error?.message?.includes('TPM') || error?.message?.includes('rate_limit_exceeded');
+    const userErrorMsg = isRateLimit 
+      ? 'O limite temporário de requisições da IA foi atingido. Por favor, aguarde alguns instantes e tente novamente.' 
+      : 'Ocorreu um erro ao processar sua resposta. Tente novamente.';
+    
+    return NextResponse.json({ success: false, error: userErrorMsg }, { status: isRateLimit ? 429 : 500 });
   }
 }
