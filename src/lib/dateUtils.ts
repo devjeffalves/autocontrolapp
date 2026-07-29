@@ -39,25 +39,28 @@ export function dateToLocalInputValue(dateInput: Date | string | number = new Da
 }
 
 /**
- * Converte o valor de um input datetime-local ("YYYY-MM-DDTHH:mm") para um objeto Date garantindo a marcação do fuso de Brasília (-03:00).
+ * Converte o valor de um input datetime-local ("YYYY-MM-DDTHH:mm") ou ISO string para um objeto Date garantindo a marcação do fuso de Brasília (-03:00).
+ * Função 100% idempotente (não desloca horas se chamada repetidamente).
  */
 export function localInputValueToDate(inputValue: string | Date): Date {
   if (!inputValue) return new Date();
   if (inputValue instanceof Date) return inputValue;
 
-  if (typeof inputValue === 'string' && inputValue.includes('T')) {
-    // Se a string já tiver offset explícito (ex: Z ou -03:00), analisa diretamente
-    if (inputValue.includes('Z') || (inputValue.includes('-') && inputValue.split('T')[1]?.includes('-'))) {
+  if (typeof inputValue === 'string') {
+    // Se a string já tiver offset explícito (ex: Z ou sufixo com fuso horário), analisa diretamente
+    if (inputValue.endsWith('Z') || (inputValue.includes('T') && inputValue.slice(10).includes('-'))) {
       const d = new Date(inputValue);
       return isNaN(d.getTime()) ? new Date() : d;
     }
 
     // Para string datetime-local padrão ("YYYY-MM-DDTHH:mm"), compor ISO string com fuso de Brasília (-03:00)
-    const [datePart, timePart] = inputValue.split('T');
-    const formattedTime = timePart.length === 5 ? timePart + ':00' : timePart;
-    const isoString = `${datePart}T${formattedTime}-03:00`;
-    const d = new Date(isoString);
-    return isNaN(d.getTime()) ? new Date(inputValue) : d;
+    if (inputValue.includes('T')) {
+      const [datePart, timePart] = inputValue.split('T');
+      const formattedTime = timePart.length === 5 ? timePart + ':00' : timePart;
+      const isoString = `${datePart}T${formattedTime}-03:00`;
+      const d = new Date(isoString);
+      return isNaN(d.getTime()) ? new Date(inputValue) : d;
+    }
   }
 
   const d = new Date(inputValue);
