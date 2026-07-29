@@ -199,14 +199,14 @@ export default function AIAssistant() {
       return (
         <React.Fragment key={idx}>
           {isBullet ? (
-            <div style={{ display: 'flex', gap: '6px', marginLeft: '2px', margin: '2px 0' }}>
-              <span style={{ color: '#2563eb', fontWeight: 'bold' }}>•</span>
-              <div>{formattedLine}</div>
+            <div style={{ display: 'flex', gap: '8px', marginLeft: '2px', margin: '3px 0', alignItems: 'flex-start' }}>
+              <span style={{ color: '#2563eb', fontWeight: 'bold', fontSize: '0.9rem', lineHeight: '1.4' }}>•</span>
+              <div style={{ flex: 1 }}>{formattedLine}</div>
             </div>
           ) : (
             <div>{formattedLine}</div>
           )}
-          {idx < lines.length - 1 && !isBullet && <div style={{ height: '3px' }} />}
+          {idx < lines.length - 1 && !isBullet && <div style={{ height: '4px' }} />}
         </React.Fragment>
       );
     });
@@ -218,19 +218,21 @@ export default function AIAssistant() {
         {showAIChat && (
           <div className="ai-modal-overlay">
             <motion.div 
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 240 }}
+              initial={{ y: 20, opacity: 0, scale: 0.96 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 20, opacity: 0, scale: 0.96 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 280 }}
               className="ai-chat-drawer"
             >
-              {/* Cabeçalho Fixo */}
+              {/* Cabeçalho Premium Dark Theme */}
               <div className="ai-chat-header">
                 <div className="ai-title">
                   <div className="ai-icon-pulse"><Bot size={18} /></div>
                   <div>
                     <h3>Assistente de Bordo</h3>
-                    <span className="online-status">Ativa agora</span>
+                    <span className="online-status">
+                      <span className="status-dot" /> Ativa agora
+                    </span>
                   </div>
                 </div>
                 
@@ -318,7 +320,9 @@ export default function AIAssistant() {
               <div className="ai-chat-messages">
                 {chatHistory.length === 0 && (
                   <div className="ai-welcome">
-                    <Sparkles size={32} style={{ color: '#2563eb' }} />
+                    <div className="sparkles-icon-bg">
+                      <Sparkles size={28} style={{ color: '#2563eb' }} />
+                    </div>
                     <h4>Como posso ajudar hoje?</h4>
                     <p>Pergunte sobre seus dias mais rentáveis, dicas de economia ou aumento de lucro por km!</p>
                     
@@ -415,35 +419,35 @@ export default function AIAssistant() {
           bottom: 0;
           width: 100vw;
           height: 100dvh;
-          background: rgba(15, 23, 42, 0.3);
-          backdrop-filter: blur(4px);
           z-index: 99999;
           display: flex;
           justify-content: flex-end;
           align-items: flex-end;
-          padding: 20px;
+          padding: 24px;
           box-sizing: border-box;
+          pointer-events: none;
         }
 
         .ai-chat-drawer {
-          width: 380px;
-          max-width: calc(100vw - 32px);
-          height: 520px;
-          max-height: calc(100dvh - 40px);
+          width: 400px;
+          max-width: calc(100vw - 48px);
+          height: 560px;
+          max-height: calc(100dvh - 48px);
           background: #ffffff;
-          border-radius: 20px;
+          border-radius: 24px;
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
-          border: 1px solid #e2e8f0;
+          box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.25), 0 0 30px rgba(37, 99, 235, 0.08);
+          border: 1px solid rgba(226, 232, 240, 0.9);
           position: relative;
+          pointer-events: auto;
         }
 
+        /* Cabeçalho Escuro e Moderno */
         .ai-chat-header {
-          padding: 12px 16px;
-          background: #ffffff;
-          border-bottom: 1px solid #e2e8f0;
+          padding: 14px 18px;
+          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -451,9 +455,39 @@ export default function AIAssistant() {
           z-index: 10;
         }
 
-        .ai-title { display: flex; align-items: center; gap: 10px; }
-        .ai-title h3 { font-size: 0.95rem; font-weight: 700; margin: 0; color: #1e293b; }
-        .online-status { font-size: 0.65rem; color: #10b981; font-weight: 600; }
+        .ai-title { display: flex; align-items: center; gap: 12px; }
+        
+        .ai-icon-pulse {
+          width: 34px;
+          height: 34px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #2563eb, #3b82f6);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 0 14px rgba(37, 99, 235, 0.45);
+        }
+
+        .ai-title h3 { font-size: 0.95rem; font-weight: 700; margin: 0; color: #ffffff; letter-spacing: -0.01em; }
+        
+        .online-status { 
+          font-size: 0.68rem; 
+          color: #34d399; 
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          margin-top: 1px;
+        }
+
+        .status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background-color: #34d399;
+          box-shadow: 0 0 8px #34d399;
+        }
 
         .header-actions {
           display: flex;
@@ -465,29 +499,31 @@ export default function AIAssistant() {
           width: 32px;
           height: 32px;
           border-radius: 50%;
-          border: 1px solid #e2e8f0;
-          background: #f8fafc;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          background: rgba(255, 255, 255, 0.1);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #475569;
+          color: #cbd5e1;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.2s ease;
         }
 
         .header-action-btn:hover, .close-ai:hover {
-          background: #e2e8f0;
-          color: #0f172a;
+          background: rgba(255, 255, 255, 0.25);
+          color: #ffffff;
+          transform: translateY(-1px);
         }
 
         /* History Panel */
         .history-panel {
           background: #ffffff;
           border-bottom: 1px solid #e2e8f0;
-          padding: 10px 14px;
-          max-height: 200px;
+          padding: 12px 16px;
+          max-height: 220px;
           overflow-y: auto;
           flex-shrink: 0;
+          box-shadow: inset 0 -4px 12px rgba(0,0,0,0.02);
         }
 
         .history-panel-header {
@@ -497,8 +533,9 @@ export default function AIAssistant() {
           font-size: 0.75rem;
           font-weight: 700;
           color: #64748b;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
           text-transform: uppercase;
+          letter-spacing: 0.04em;
         }
 
         .close-history-btn {
@@ -517,37 +554,45 @@ export default function AIAssistant() {
         .new-session-item {
           display: flex;
           align-items: center;
-          gap: 6px;
-          padding: 6px 10px;
-          border-radius: 8px;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: 10px;
           border: 1px dashed #cbd5e1;
           background: #f8fafc;
           color: #2563eb;
-          font-size: 0.75rem;
+          font-size: 0.78rem;
           font-weight: 700;
           cursor: pointer;
           width: 100%;
+          transition: all 0.2s;
+        }
+
+        .new-session-item:hover {
+          background: #eff6ff;
+          border-color: #2563eb;
         }
 
         .history-item {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 6px 10px;
-          border-radius: 8px;
-          background: #f1f5f9;
+          padding: 8px 12px;
+          border-radius: 10px;
+          background: #f8fafc;
+          border: 1px solid #f1f5f9;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: all 0.2s;
         }
 
         .history-item:hover {
-          background: #e2e8f0;
+          background: #f1f5f9;
+          border-color: #e2e8f0;
         }
 
         .history-item-info {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
         }
 
         .history-item-icon {
@@ -555,7 +600,7 @@ export default function AIAssistant() {
         }
 
         .history-item-title {
-          font-size: 0.75rem;
+          font-size: 0.78rem;
           font-weight: 600;
           color: #1e293b;
           margin: 0;
@@ -571,8 +616,9 @@ export default function AIAssistant() {
           border: none;
           color: #ef4444;
           cursor: pointer;
-          padding: 2px;
+          padding: 4px;
           opacity: 0.7;
+          transition: opacity 0.2s;
         }
 
         .delete-history-btn:hover {
@@ -583,7 +629,7 @@ export default function AIAssistant() {
           font-size: 0.75rem;
           color: #94a3b8;
           text-align: center;
-          margin: 6px 0;
+          margin: 8px 0;
         }
 
         /* Messages Container */
@@ -592,84 +638,113 @@ export default function AIAssistant() {
           min-height: 0;
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
-          padding: 14px 16px;
+          padding: 16px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 14px;
           background: #f8fafc;
           overscroll-behavior: contain;
         }
 
         .ai-welcome {
           text-align: center;
-          padding: 16px 8px;
+          padding: 20px 12px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
+        }
+
+        .sparkles-icon-bg {
+          width: 52px;
+          height: 52px;
+          border-radius: 18px;
+          background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
         }
 
         .ai-welcome h4 {
-          font-size: 1rem;
+          font-size: 1.05rem;
           font-weight: 800;
           color: #0f172a;
           margin: 0;
+          letter-spacing: -0.02em;
         }
 
         .ai-welcome p {
-          font-size: 0.8rem;
+          font-size: 0.82rem;
           color: #64748b;
           margin: 0;
+          line-height: 1.5;
         }
 
         .prompt-suggestions {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 8px;
           width: 100%;
-          margin-top: 8px;
+          margin-top: 10px;
         }
 
         .prompt-suggestions button {
-          padding: 8px 12px;
-          border-radius: 10px;
+          padding: 10px 14px;
+          border-radius: 14px;
           border: 1px solid #e2e8f0;
           background: #ffffff;
-          color: #334155;
-          font-size: 0.75rem;
+          color: #1e293b;
+          font-size: 0.8rem;
           font-weight: 600;
           text-align: left;
           cursor: pointer;
-          transition: all 0.2s;
+          box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .prompt-suggestions button:hover {
           border-color: #2563eb;
           color: #2563eb;
           background: #eff6ff;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
         }
 
-        .chat-bubble-container { display: flex; gap: 6px; max-width: 90%; }
+        .chat-bubble-container { display: flex; gap: 8px; max-width: 90%; }
         .chat-bubble-container.user { align-self: flex-end; flex-direction: row-reverse; }
         .chat-bubble-container.assistant { align-self: flex-start; }
 
         .chat-bubble { 
-          padding: 10px 14px; 
-          border-radius: 16px; 
-          font-size: 0.85rem; 
-          line-height: 1.45; 
+          padding: 12px 16px; 
+          border-radius: 18px; 
+          font-size: 0.88rem; 
+          line-height: 1.5; 
           word-break: break-word;
         }
-        .chat-bubble.user { background: #2563eb; color: white; border-bottom-right-radius: 4px; }
-        .chat-bubble.assistant { background: white; color: #1e293b; border-bottom-left-radius: 4px; border: 1px solid #e2e8f0; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        
+        .chat-bubble.user { 
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
+          color: #ffffff; 
+          border-bottom-right-radius: 4px; 
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+        }
+        
+        .chat-bubble.assistant { 
+          background: #ffffff; 
+          color: #0f172a; 
+          border-bottom-left-radius: 4px; 
+          border: 1px solid #e2e8f0; 
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        }
 
         .ai-chat-input {
-          padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)) 14px;
-          background: white;
+          padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) 16px;
+          background: #ffffff;
           border-top: 1px solid #e2e8f0;
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
           flex-shrink: 0;
           z-index: 10;
         }
@@ -677,23 +752,25 @@ export default function AIAssistant() {
         .input-wrapper { flex: 1; }
         .input-wrapper input {
           width: 100%;
-          padding: 10px 14px;
-          background: #f1f5f9;
-          border: 1px solid transparent;
-          border-radius: 18px;
+          padding: 10px 16px;
+          background: #f8fafc;
+          border: 1px solid #cbd5e1;
+          border-radius: 22px;
           font-size: 0.9rem;
-          color: #1e293b;
+          color: #0f172a;
           outline: none;
+          transition: all 0.2s;
         }
 
         .input-wrapper input:focus {
           border-color: #2563eb;
           background: #ffffff;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
         }
 
         .mic-btn-ai, .send-btn-ai, .delete-voice-btn {
-          width: 38px;
-          height: 38px;
+          width: 40px;
+          height: 40px;
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -706,8 +783,19 @@ export default function AIAssistant() {
         }
 
         .mic-btn-ai { background: #f1f5f9; color: #2563eb; }
+        .mic-btn-ai:hover { background: #e2e8f0; }
         .mic-btn-ai.listening { background: #ef4444; color: white; }
-        .send-btn-ai { background: #2563eb; color: white; }
+        
+        .send-btn-ai { 
+          background: linear-gradient(135deg, #2563eb, #1d4ed8); 
+          color: white; 
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        .send-btn-ai:hover {
+          box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+          transform: translateY(-1px);
+        }
+
         .delete-voice-btn { background: #fee2e2; color: #ef4444; }
 
         .speak-btn {
@@ -723,36 +811,44 @@ export default function AIAssistant() {
           color: #2563eb;
           cursor: pointer;
           flex-shrink: 0;
+          transition: all 0.2s;
         }
 
+        .speak-btn:hover {
+          background: #f1f5f9;
+        }
+
+        /* Mobile Version: Gaveta inferior moderna (82dvh) */
         @media (max-width: 640px) {
           .ai-modal-overlay {
             padding: 0;
             align-items: flex-end;
-            background: rgba(15, 23, 42, 0.4);
+            background: rgba(15, 23, 42, 0.35);
+            backdrop-filter: blur(6px);
+            pointer-events: auto;
           }
           .ai-chat-drawer { 
-            height: 80dvh; 
-            max-height: 80dvh; 
+            height: 82dvh; 
+            max-height: 82dvh; 
             width: 100vw;
             max-width: 100vw;
-            border-radius: 20px 20px 0 0; 
+            border-radius: 24px 24px 0 0; 
             border: none;
-            box-shadow: 0 -10px 30px rgba(0,0,0,0.25);
+            box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.25);
           }
           .ai-chat-header {
-            padding-top: max(14px, env(safe-area-inset-top, 14px));
-            padding-left: 16px;
-            padding-right: 16px;
-            padding-bottom: 12px;
+            padding-top: max(16px, env(safe-area-inset-top, 16px));
+            padding-left: 18px;
+            padding-right: 18px;
+            padding-bottom: 14px;
           }
           .ai-chat-messages {
-            padding: 12px 14px;
+            padding: 14px 16px;
           }
           .ai-chat-input { 
-            padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
-            padding-left: 12px;
-            padding-right: 12px;
+            padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+            padding-left: 14px;
+            padding-right: 14px;
           }
           .chat-bubble-container {
             max-width: 92%;
