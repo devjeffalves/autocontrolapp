@@ -160,7 +160,7 @@ export default function Historico() {
 
     const price = totalLitres > 0 ? (totalFuelCost / totalLitres) : 5.50;
     const calculatedAvg = totalLitres > 0 ? (totalKm / totalLitres) : 0;
-    const isAvgInconsistent = totalLitres > 0 && (calculatedAvg < 6 || calculatedAvg > 22);
+    const isAvgInconsistent = totalLitres > 0 && (calculatedAvg < 6 || calculatedAvg > 25);
 
     const consumption = (totalLitres > 0 && !isAvgInconsistent)
       ? calculatedAvg
@@ -174,7 +174,10 @@ export default function Historico() {
     const now = new Date();
     
     return history.filter(item => {
-      const itemDate = new Date(item.date || item.createdAt || Date.now());
+      const rawDate = item.date || item.startTime || item.createdAt;
+      if (!rawDate) return false;
+      const itemDate = new Date(rawDate);
+      if (isNaN(itemDate.getTime())) return false;
 
       // 1. Filtro por Plataforma
       if (platformFilter !== 'todos' && item.platform !== platformFilter) {
@@ -190,13 +193,9 @@ export default function Historico() {
       } else if (periodFilter === 'semana') {
         const day = now.getDay();
         const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(now);
-        monday.setDate(diffToMonday);
-        monday.setHours(0, 0, 0, 0);
+        const monday = new Date(now.getFullYear(), now.getMonth(), diffToMonday, 0, 0, 0, 0);
 
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        sunday.setHours(23, 59, 59, 999);
+        const sunday = new Date(now.getFullYear(), now.getMonth(), diffToMonday + 6, 23, 59, 59, 999);
 
         if (itemDate < monday || itemDate > sunday) return false;
       } else if (periodFilter === 'selecionar_semana') {

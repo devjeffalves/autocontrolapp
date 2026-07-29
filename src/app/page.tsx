@@ -265,20 +265,20 @@ export default function Dashboard() {
   const activeSession = rides.find(r => r.status === 'open');
 
   const filteredRides = closedRides.filter(ride => {
-    const rideDate = new Date(ride.date);
+    const rawDate = ride.date || ride.startTime || ride.createdAt;
+    if (!rawDate) return false;
+    const rideDate = new Date(rawDate);
+    if (isNaN(rideDate.getTime())) return false;
+    
     const now = new Date();
     if (period === 'Dia') {
       return rideDate.toDateString() === now.toDateString();
     } else if (period === 'Semana') {
       const day = now.getDay();
       const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(now);
-      monday.setDate(diffToMonday);
-      monday.setHours(0, 0, 0, 0);
+      const monday = new Date(now.getFullYear(), now.getMonth(), diffToMonday, 0, 0, 0, 0);
 
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
+      const sunday = new Date(now.getFullYear(), now.getMonth(), diffToMonday + 6, 23, 59, 59, 999);
 
       return rideDate >= monday && rideDate <= sunday;
     } else if (period === 'Escolher Semana') {
@@ -303,15 +303,38 @@ export default function Dashboard() {
 
   // Cálculos baseados nos dados filtrados
   const totalEarnings = filteredRides.reduce((acc, curr) => acc + (curr.earnings || 0), 0);
-  const totalKm = filteredRides.reduce((acc, curr) => acc + (curr.kmTotal || 0), 0);
   
-  // Cálculo de custo de combustível no período filtrado (para exibir como gasto real, se necessário)
+  // Detalhamento de KM (Trabalho vs Deslocamento Pessoal/Gaps)
+  const workKm = filteredRides.filter(r => r.platform !== 'Passeio').reduce((acc, curr) => acc + (curr.kmTotal || 0), 0);
+  const recordedPersonalKm = filteredRides.filter(r => r.platform === 'Passeio').reduce((acc, curr) => acc + (curr.kmTotal || 0), 0);
+
+  // Calcular lacunas/gaps não registrados entre corridas consecutivas no período
+  let unloggedGapsKm = 0;
+  const sortedPeriodRides = [...filteredRides].sort((a, b) => {
+    const tA = new Date(a.date || a.startTime || a.createdAt).getTime();
+    const tB = new Date(b.date || b.startTime || b.createdAt).getTime();
+    return tA - tB;
+  });
+  for (let i = 0; i < sortedPeriodRides.length - 1; i++) {
+    const currRide = sortedPeriodRides[i];
+    const nextRide = sortedPeriodRides[i + 1];
+    const endKm = currRide.kmEnd || currRide.kmStart || 0;
+    const nextStartKm = nextRide.kmStart || 0;
+    if (endKm > 0 && nextStartKm > endKm) {
+      unloggedGapsKm += (nextStartKm - endKm);
+    }
+  }
+
+  const personalKm = recordedPersonalKm + unloggedGapsKm;
+  const totalKm = workKm + personalKm;
+  
+  // Cálculo de custo de combustível no período filtrado
   const totalFuelCost = filteredRides.reduce((acc, curr) => {
     const rideCost = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.cost || 0), 0) || 0;
     return acc + rideCost;
   }, 0);
 
-  // Calcula o preço médio do combustível baseado em todo o histórico
+  // Preço médio do combustível baseado em todo o histórico
   let totalFuelCostForAvg = 0;
   let totalLitresForAvg = 0;
   rides.forEach(r => {
@@ -323,55 +346,68 @@ export default function Dashboard() {
 
   const avgFuelPrice = totalLitresForAvg > 0 ? (totalFuelCostForAvg / totalLitresForAvg) : 5.89;
 
-  // Cálculo do Consumo Médio (km/L)
-  let totalKmForCons = 0;
-  let totalLitresForCons = 0;
+  // Litros abastecidos no período filtrado
+  const totalLitresInPeriod = filteredRides.reduce((acc, curr) => {
+    const rideLitres = curr.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
+    return acc + rideLitres;
+  }, 0);
 
-  filteredRides.forEach(ride => {
-    const rideLitres = ride.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
-    if (rideLitres > 0) {
-      totalLitresForCons += rideLitres;
-      totalKmForCons += (ride.kmTotal || 0);
-    }
-  });
-
-  const calculatedAvgConsumption = totalLitresForCons > 0 ? (totalKmForCons / totalLitresForCons) : (vehicle?.avgConsumption || 14.5);
-  const isConsumptionInconsistent = totalLitresForCons > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
-
-  const realAvgConsumptionNum = (totalLitresForCons > 0 && !isConsumptionInconsistent) 
-    ? calculatedAvgConsumption 
-    : (vehicle?.avgConsumption || 14.5);
-    
-  // Exibimos a média calculada para que o usuário veja a discrepância se houver litros, 
-  // ou a média do veículo se não houver registros de litros.
-  const displayAvgConsumptionNum = totalLitresForCons > 0 ? calculatedAvgConsumption : (vehicle?.avgConsumption || 14.5);
-  const realAvgConsumption = displayAvgConsumptionNum.toFixed(1);
-
-  // Consumo acumulado real GLOBAL (de todo o histórico de viagens)
+  // Média e totais globais (todo o histórico de corridas fechadas)
   let totalLitresGlobal = 0;
   let totalKmGlobal = 0;
-  rides.filter(r => r.status === 'closed').forEach(r => {
+  closedRides.forEach(r => {
     const rideLitres = r.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
     totalLitresGlobal += rideLitres;
     totalKmGlobal += (r.kmTotal || 0);
   });
-  
+
   const calculatedAvgGlobal = totalLitresGlobal > 0 ? (totalKmGlobal / totalLitresGlobal) : 0;
-  const isGlobalInconsistent = totalLitresGlobal > 0 && (calculatedAvgGlobal < 6 || calculatedAvgGlobal > 22);
-  
-  const globalConsumptionNum = (totalLitresGlobal > 0 && !isGlobalInconsistent)
-    ? calculatedAvgGlobal
-    : (vehicle?.avgConsumption || 14.5);
+  const isGlobalConsistent = totalLitresGlobal > 0 && calculatedAvgGlobal >= 6 && calculatedAvgGlobal <= 25;
+
+  const calculatedAvgPeriod = totalLitresInPeriod > 0 ? (totalKm / totalLitresInPeriod) : 0;
+  const isPeriodConsistent = totalLitresInPeriod > 0 && calculatedAvgPeriod >= 6 && calculatedAvgPeriod <= 25;
+
+  // Define a média real consumida:
+  // Se o período tiver abastecimentos e média consistente, usa a do período.
+  // Se não houver abastecimentos no período (ou o abastecimento ocorreu no final do período para uso futuro), usa a média global acumulada.
+  // Fallback final: consumo médio do veículo cadastrado.
+  let realAvgConsumptionNum = vehicle?.avgConsumption || 14.5;
+  if (isPeriodConsistent) {
+    realAvgConsumptionNum = calculatedAvgPeriod;
+  } else if (isGlobalConsistent) {
+    realAvgConsumptionNum = calculatedAvgGlobal;
+  }
+
+  const displayAvgConsumptionNum = (totalLitresInPeriod > 0 && isPeriodConsistent) 
+    ? calculatedAvgPeriod 
+    : (isGlobalConsistent ? calculatedAvgGlobal : (vehicle?.avgConsumption || 14.5));
+    
+  const realAvgConsumption = displayAvgConsumptionNum.toFixed(1);
+  const isConsumptionInconsistent = totalLitresInPeriod > 0 && !isPeriodConsistent && !isGlobalConsistent;
 
   // Custo estimado de combustível para a distância percorrida no período
   const estimatedFuelCost = totalKm > 0 ? (totalKm / realAvgConsumptionNum) * avgFuelPrice : 0;
   
-  // Cálculo de carga horária acumulada no período filtrado
+  // Cálculo de carga horária acumulada no período filtrado (subtraindo pausas)
   const totalMinutes = filteredRides.reduce((acc, curr) => {
-    if (curr.startTime && curr.endTime) {
-      const diffMs = new Date(curr.endTime).getTime() - new Date(curr.startTime).getTime();
-      const diffMin = Math.round(diffMs / 60000);
-      return acc + (diffMin > 0 ? diffMin : 0);
+    const sVal = curr.startTime || curr.date || curr.createdAt;
+    const eVal = curr.endTime || curr.date || curr.createdAt;
+    if (sVal && eVal) {
+      const startMs = new Date(sVal).getTime();
+      const endMs = new Date(eVal).getTime();
+      if (!isNaN(startMs) && !isNaN(endMs) && endMs >= startMs) {
+        const totalDiffMs = endMs - startMs;
+        const totalPauseMs = (curr.pauses || []).reduce((pAcc: number, p: any) => {
+          if (!p.startTime) return pAcc;
+          const pStart = new Date(p.startTime).getTime();
+          const pEnd = p.endTime ? new Date(p.endTime).getTime() : pStart;
+          if (isNaN(pStart) || isNaN(pEnd)) return pAcc;
+          return pAcc + Math.max(0, pEnd - pStart);
+        }, 0);
+        const workingMs = Math.max(0, totalDiffMs - totalPauseMs);
+        const diffMin = Math.round(workingMs / 60000);
+        return acc + diffMin;
+      }
     }
     return acc;
   }, 0);
@@ -444,7 +480,11 @@ export default function Dashboard() {
     const weeklyKmCount = [0, 0, 0, 0, 0, 0, 0];
 
     ridesForChart.forEach(ride => {
-      const rideDate = new Date(ride.date);
+      const rawDate = ride.date || ride.startTime || ride.createdAt;
+      if (!rawDate) return;
+      const rideDate = new Date(rawDate);
+      if (isNaN(rideDate.getTime())) return;
+
       if (rideDate >= startOfWeek && rideDate <= endOfWeek) {
         const dayOfWeek = rideDate.getDay();
         const index = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -582,7 +622,7 @@ export default function Dashboard() {
       label: 'Km Rodados', 
       value: `${totalKm.toFixed(1)} km`, 
       icon: Navigation, 
-      trend: `R$ ${profitPerKm.toFixed(2)}/km`, 
+      trend: `${workKm.toFixed(0)}km trab. | ${personalKm.toFixed(0)}km pess.`, 
       trendUp: true,
       color: 'var(--warning)'
     },
@@ -882,7 +922,7 @@ export default function Dashboard() {
                 if (rideFuelLitres > 0) {
                   rideFuelPrice = rideFuelCost / rideFuelLitres;
                 }
-                const fuelCostConsumed = (itemKm / globalConsumptionNum) * rideFuelPrice;
+                const fuelCostConsumed = (itemKm / realAvgConsumptionNum) * rideFuelPrice;
                 const lucroReal = (item.earnings || 0) - fuelCostConsumed;
 
                 return (
@@ -912,7 +952,7 @@ export default function Dashboard() {
                       <p className="activity-meta">
                         {itemKm.toFixed(1)}km • {new Date(item.date).toLocaleDateString('pt-BR')}
                         {item.fuelings?.length > 0 && ` • ${item.fuelings.length} Abast. (R$ ${rideFuelCost.toFixed(2)})`}
-                        {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / globalConsumptionNum).toFixed(1)}L`}
+                        {item.platform !== 'Passeio' && ` • Consumo: ${(itemKm / realAvgConsumptionNum).toFixed(1)}L`}
                       </p>
                     </div>
                     <div className="activity-actions">

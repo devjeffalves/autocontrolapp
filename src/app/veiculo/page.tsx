@@ -53,7 +53,7 @@ export default function Veiculo() {
           const calculatedAvg = totalKm / totalLitres;
           
           // Consumo é consistente se estiver em uma faixa física realista (ex: entre 6 e 22 km/L)
-          const isAvgInconsistent = calculatedAvg < 6 || calculatedAvg > 22;
+          const isAvgInconsistent = calculatedAvg < 6 || calculatedAvg > 25;
           
           setRealAvg(calculatedAvg);
           if (!isAvgInconsistent) {
@@ -144,7 +144,7 @@ export default function Veiculo() {
   }, []);
 
   const displayAvg = realAvg || vehicle.avgConsumption;
-  const isConsumptionInconsistent = realAvg !== null && (realAvg < 6 || realAvg > 22);
+  const isConsumptionInconsistent = realAvg !== null && (realAvg < 6 || realAvg > 25);
 
   // Auto-save logic
   useEffect(() => {

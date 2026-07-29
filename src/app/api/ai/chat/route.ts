@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     const avgFuelPrice = globalLitres > 0 ? (globalCost / globalLitres) : 5.50;
     const calculatedAvgConsumption = globalLitres > 0 ? (globalKm / globalLitres) : 0;
-    const isConsumptionInconsistent = globalLitres > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 22);
+    const isConsumptionInconsistent = globalLitres > 0 && (calculatedAvgConsumption < 6 || calculatedAvgConsumption > 25);
 
     const vehicleAvgConsumption = (globalLitres > 0 && !isConsumptionInconsistent)
       ? calculatedAvgConsumption

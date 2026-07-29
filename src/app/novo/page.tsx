@@ -11,6 +11,8 @@ export default function NovoRegistro() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [lastKmEnd, setLastKmEnd] = useState<number | null>(null);
+  const [autoLogPersonalGap, setAutoLogPersonalGap] = useState(true);
 
   const getLocalDateTimeString = (date?: Date) => dateToLocalInputValue(date || new Date());
 
@@ -186,8 +188,25 @@ export default function NovoRegistro() {
 
   const fetchActiveSession = async () => {
     try {
-      const res = await fetch('/api/rides?status=open');
-      const json = await res.json();
+      const [openRes, ridesRes] = await Promise.all([
+        fetch('/api/rides?status=open'),
+        fetch('/api/rides')
+      ]);
+      const json = await openRes.json();
+      const ridesJson = await ridesRes.json();
+
+      if (ridesJson.success && ridesJson.data.length > 0) {
+        const closed = ridesJson.data.filter((r: any) => r.status === 'closed');
+        if (closed.length > 0) {
+          const last = closed[0];
+          const km = last.kmEnd || last.kmStart || 0;
+          if (km > 0) {
+            setLastKmEnd(km);
+            setStartData(prev => ({ ...prev, kmStart: prev.kmStart || String(km) }));
+          }
+        }
+      }
+
       if (json.success && json.data.length > 0) {
         setActiveSession(json.data[0]);
         setFinishData(prev => ({ ...prev, platform: json.data[0].platform, endTime: getLocalDateTimeString() }));
@@ -208,7 +227,7 @@ export default function NovoRegistro() {
       const res = await fetch('/api/rides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...startData, action: 'start' }),
+        body: JSON.stringify({ ...startData, autoLogPersonalGap, action: 'start' }),
       });
       const json = await res.json();
       if (json.success) {
@@ -394,6 +413,34 @@ export default function NovoRegistro() {
                   disabled={submitting}
                 />
               </div>
+
+              {lastKmEnd !== null && Number(startData.kmStart) > lastKmEnd && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  border: '1px solid #bae6fd',
+                  padding: '12px 14px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0369a1', fontSize: '0.85rem' }}>
+                    <Navigation size={16} />
+                    <span>
+                      <strong>+{Number(startData.kmStart) - lastKmEnd} KM</strong> de deslocamento desde o último turno ({lastKmEnd} KM).
+                    </span>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#0284c7', cursor: 'pointer', fontWeight: 600 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={autoLogPersonalGap} 
+                      onChange={e => setAutoLogPersonalGap(e.target.checked)} 
+                    />
+                    Registrar {Number(startData.kmStart) - lastKmEnd} km como Deslocamento Pessoal / Passeio
+                  </label>
+                </div>
+              )}
 
               <div className="input-group">
                 <label>Data e Hora de Início</label>

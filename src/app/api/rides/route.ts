@@ -85,14 +85,48 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'Já existe uma sessão ativa (aberta ou em pausa)' }, { status: 400 });
       }
       
+      const newKmStart = Number(body.kmStart);
       const startTimeVal = parseDateInput(body.startTime);
+
+      // Se houver diferença de KM em relação ao último turno fechado e autoLogPersonalGap for true
+      if (body.autoLogPersonalGap !== false) {
+        const lastClosedRide = await Ride.findOne({ status: 'closed' }).sort({ date: -1, createdAt: -1 });
+        if (lastClosedRide) {
+          const lastKm = lastClosedRide.kmEnd || lastClosedRide.kmStart || 0;
+          if (lastKm > 0 && newKmStart > lastKm) {
+            const gapKm = newKmStart - lastKm;
+            await Ride.create({
+              platform: 'Passeio',
+              rides: 0,
+              earnings: 0,
+              kmStart: lastKm,
+              kmEnd: newKmStart,
+              kmTotal: gapKm,
+              status: 'closed',
+              date: startTimeVal,
+              startTime: startTimeVal,
+              endTime: startTimeVal
+            });
+          }
+        }
+      }
+
       const ride = await Ride.create({
-        kmStart: body.kmStart,
+        kmStart: newKmStart,
         platform: body.platform || 'Aplicativos',
         date: startTimeVal,
         startTime: startTimeVal,
         status: 'open'
       });
+
+      // Atualizar KM do veículo com o odômetro inicial do turno
+      if (newKmStart > 0) {
+        await Vehicle.findOneAndUpdate(
+          {},
+          { $max: { currentKm: newKmStart }, lastUpdated: new Date() }
+        );
+      }
+
       return NextResponse.json({ success: true, data: ride }, { status: 201 });
     }
 
