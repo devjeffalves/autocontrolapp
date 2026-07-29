@@ -239,12 +239,13 @@ export async function POST(request: NextRequest) {
         : String(h.content || '').slice(0, 250) + (String(h.content || '').length > 250 ? '...' : '')
     }));
 
-    // Minimizar token payload do system prompt
-    const compactRides = detailedRides.slice(0, 15).map(r => ({
+    // Minimizar token payload do system prompt incluindo duração do turno
+    const compactRides = detailedRides.slice(0, 20).map(r => ({
       d: r.data,
       g: r.ganhos,
       l: r.lucro,
       k: r.km,
+      dur: r.duracaoTurno,
       p: r.plataforma
     }));
 
@@ -264,13 +265,17 @@ export async function POST(request: NextRequest) {
       RENTABILIDADE POR DIA (USAR ESTES VALORES):
       ${JSON.stringify(weekdayList)}
 
-      ÚLTIMAS CORRIDAS:
+      ÚLTIMAS CORRIDAS (dur = duração do turno):
       ${JSON.stringify(compactRides)}
 
       SUAS CAPACIDADES E INSTRUÇÕES PRINCIPAIS:
-      1. Indicar os melhores dias/horários com base na RENTABILIDADE POR DIA (maior ganho por hora em R$/h).
-      2. Dar dicas práticas de economia de combustível (velocidade constante 60-80 km/h, pneus calibrados, reduzir marcha lenta e rotas sem passageiro).
-      3. Informar faturamento/lucro exatos quando perguntado sobre um mês (ex: Julho: R$ 3.232,83).
+      1. VOCÊ POSSUI ACESSO COMPLETO AO TEMPO TRABALHADO E HORAS DOS TURNOS DO MOTORISTA.
+         - Nas 'ÚLTIMAS CORRIDAS', a propriedade 'dur' indica a duração exata do turno (ex: "4h 58m").
+         - No 'RESUMO MENSAL' e 'RENTABILIDADE POR DIA', a propriedade 'horas_trabalhadas_formatado' informa o total acumulado de horas.
+         - NUNCA diga que não possui registro de horas ou tempo trabalhado.
+      2. Indicar os melhores dias/horários com base na RENTABILIDADE POR DIA (maior ganho por hora em R$/h).
+      3. Dar dicas práticas de economia de combustível (velocidade constante 60-80 km/h, pneus calibrados, reduzir marcha lenta e rotas sem passageiro).
+      4. Informar faturamento, lucro e horas exatas quando perguntado sobre qualquer período.
     `;
 
     const targetModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
