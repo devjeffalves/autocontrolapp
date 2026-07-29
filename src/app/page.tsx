@@ -1047,7 +1047,7 @@ export default function Dashboard() {
                     <label>Início do Turno</label>
                     <input 
                       type="datetime-local" 
-                      value={formatForDateTimeInput(editingItem.startTime)} 
+                      value={dateToLocalInputValue(editingItem.startTime)} 
                       onChange={e => setEditingItem({...editingItem, startTime: e.target.value})}
                     />
                   </div>
@@ -1055,7 +1055,7 @@ export default function Dashboard() {
                     <label>Fim do Turno</label>
                     <input 
                       type="datetime-local" 
-                      value={formatForDateTimeInput(editingItem.endTime)} 
+                      value={dateToLocalInputValue(editingItem.endTime)} 
                       onChange={e => setEditingItem({...editingItem, endTime: e.target.value})}
                     />
                   </div>
