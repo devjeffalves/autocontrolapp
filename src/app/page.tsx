@@ -238,10 +238,15 @@ export default function Dashboard() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const updatedData = { ...editingItem };
+      if (updatedData.startTime) {
+        updatedData.date = updatedData.startTime;
+      }
+
       const res = await fetch(`/api/rides/${editingItem._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingItem),
+        body: JSON.stringify(updatedData),
       });
       const data = await res.json();
       if (data.success) {
