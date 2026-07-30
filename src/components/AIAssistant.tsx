@@ -14,6 +14,8 @@ export default function AIAssistant() {
   const [isAiListening, setIsAiListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const lastAssistantMsgRef = useRef<HTMLDivElement>(null);
 
   // Arquivar sessão atual no histórico
   const archiveCurrentSession = (messagesToArchive: any[]) => {
@@ -47,6 +49,18 @@ export default function AIAssistant() {
     }
   }, []);
 
+  // Bloquear a rolagem da página quando o modal estiver aberto
+  useEffect(() => {
+    if (showAIChat) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showAIChat]);
+
   // Escutar evento global para abrir o chat sempre com UMA CONVERSA NOVA/LIMPA
   useEffect(() => {
     const handleOpenAI = () => {
@@ -59,30 +73,53 @@ export default function AIAssistant() {
         return [];
       });
       localStorage.removeItem('autocontrol_ai_current_chat');
-      document.body.style.overflow = 'hidden';
     };
     
     const handleCloseAI = () => {
       setShowAIChat(false);
-      document.body.style.overflow = 'auto';
     };
 
     window.addEventListener('open-ai-assistant', handleOpenAI);
     return () => {
       window.removeEventListener('open-ai-assistant', handleOpenAI);
-      document.body.style.overflow = 'auto';
     };
   }, []);
 
-  // Rolar para o fim quando houver nova mensagem
+  // Lógica inteligente de rolagem:
+  // Se for a mensagem do assistente retornada, rola para o INÍCIO da mensagem da IA para que o usuário leia do começo.
+  // Caso contrário (mensagem do usuário ou carregamento), rola até o final do container.
   useEffect(() => {
     if (chatHistory.length > 0) {
-      scrollToBottom();
+      const lastMsg = chatHistory[chatHistory.length - 1];
+      if (lastMsg.role === 'assistant' && !aiLoading) {
+        setTimeout(() => {
+          scrollToStartOfAssistantMessage();
+        }, 50);
+      } else {
+        scrollToBottom();
+      }
     }
   }, [chatHistory, aiLoading]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const scrollToStartOfAssistantMessage = () => {
+    if (lastAssistantMsgRef.current && messagesContainerRef.current) {
+      const topPos = lastAssistantMsgRef.current.offsetTop - 12;
+      messagesContainerRef.current.scrollTo({
+        top: Math.max(0, topPos),
+        behavior: 'smooth'
+      });
+    } else {
+      scrollToBottom();
+    }
   };
 
   const startAiListening = () => {
@@ -327,7 +364,7 @@ export default function AIAssistant() {
               </AnimatePresence>
 
               {/* Conteúdo com Rolagem Fluida */}
-              <div className="ai-chat-messages">
+              <div className="ai-chat-messages" ref={messagesContainerRef}>
                 {chatHistory.length === 0 && (
                   <div className="ai-welcome">
                     <div className="sparkles-icon-bg">
@@ -350,22 +387,29 @@ export default function AIAssistant() {
                   </div>
                 )}
                 
-                {chatHistory.map((msg, i) => (
-                  <div key={i} className={`chat-bubble-container ${msg.role}`}>
-                    <div className={`chat-bubble ${msg.role}`}>
-                      {msg.role === 'assistant' ? renderFormattedContent(msg.content) : msg.content}
+                {chatHistory.map((msg, i) => {
+                  const isLastAssistant = msg.role === 'assistant' && i === chatHistory.length - 1;
+                  return (
+                    <div 
+                      key={i} 
+                      ref={isLastAssistant ? lastAssistantMsgRef : null}
+                      className={`chat-bubble-container ${msg.role}`}
+                    >
+                      <div className={`chat-bubble ${msg.role}`}>
+                        {msg.role === 'assistant' ? renderFormattedContent(msg.content) : msg.content}
+                      </div>
+                      {msg.role === 'assistant' && (
+                        <button 
+                          className={`speak-btn ${isSpeaking === `msg-${i}` ? 'speaking' : ''}`} 
+                          onClick={() => speakMessage(msg.content, `msg-${i}`)}
+                          title="Ouvir resposta"
+                        >
+                          {isSpeaking === `msg-${i}` ? <Square size={13} fill="currentColor" /> : <Volume2 size={13} />}
+                        </button>
+                      )}
                     </div>
-                    {msg.role === 'assistant' && (
-                      <button 
-                        className={`speak-btn ${isSpeaking === `msg-${i}` ? 'speaking' : ''}`} 
-                        onClick={() => speakMessage(msg.content, `msg-${i}`)}
-                        title="Ouvir resposta"
-                      >
-                        {isSpeaking === `msg-${i}` ? <Square size={13} fill="currentColor" /> : <Volume2 size={13} />}
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
                 
                 {aiLoading && (
                   <div className="chat-bubble assistant loading">
@@ -840,6 +884,8 @@ export default function AIAssistant() {
             background: rgba(15, 23, 42, 0.45);
             backdrop-filter: blur(8px);
             pointer-events: auto;
+            overflow: hidden;
+            overscroll-behavior: contain;
           }
 
           .mobile-drag-indicator {
@@ -853,8 +899,10 @@ export default function AIAssistant() {
           }
 
           .ai-chat-drawer { 
-            height: 85dvh; 
-            max-height: 85dvh; 
+            height: 82vh;
+            height: 82dvh; 
+            max-height: calc(100vh - 40px); 
+            max-height: calc(100dvh - 40px); 
             width: 100vw;
             max-width: 100vw;
             border-radius: 24px 24px 0 0; 
@@ -872,6 +920,8 @@ export default function AIAssistant() {
 
           .ai-chat-messages {
             padding: 14px 16px;
+            scroll-behavior: smooth;
+            overscroll-behavior: contain;
           }
 
           .ai-chat-input { 
