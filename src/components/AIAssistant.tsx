@@ -479,7 +479,9 @@ export default function AIAssistant() {
           align-items: flex-end;
           padding: 24px;
           box-sizing: border-box;
-          pointer-events: none;
+          background: rgba(15, 23, 42, 0.25);
+          backdrop-filter: blur(4px);
+          pointer-events: auto;
         }
 
         .mobile-drag-indicator {
@@ -490,6 +492,7 @@ export default function AIAssistant() {
           width: 400px;
           max-width: calc(100vw - 48px);
           height: 560px;
+          min-height: 480px;
           max-height: calc(100dvh - 48px);
           background: #ffffff;
           border-radius: 24px;
@@ -899,12 +902,10 @@ export default function AIAssistant() {
           }
 
           .ai-chat-drawer { 
-            height: 82vh;
-            height: 82dvh; 
-            max-height: calc(100vh - 40px); 
-            max-height: calc(100dvh - 40px); 
-            width: 100vw;
-            max-width: 100vw;
+            height: 80%;
+            max-height: 80%;
+            width: 100%;
+            max-width: 100%;
             border-radius: 24px 24px 0 0; 
             border: none;
             box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.3);
@@ -912,11 +913,13 @@ export default function AIAssistant() {
           }
 
           .ai-chat-header {
-            padding-top: max(8px, env(safe-area-inset-top, 8px));
+            padding-top: max(18px, env(safe-area-inset-top, 18px));
             padding-left: 16px;
             padding-right: 16px;
             padding-bottom: 12px;
           }
+
+
 
           .ai-chat-messages {
             padding: 14px 16px;
@@ -931,7 +934,11 @@ export default function AIAssistant() {
           }
 
           .chat-bubble-container {
-            max-width: 92%;
+            max-width: 88%;
+          }
+          .chat-bubble {
+            padding: 10px 14px;
+            font-size: 0.85rem;
           }
         }
       `}</style>
