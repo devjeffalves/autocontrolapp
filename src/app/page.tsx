@@ -69,105 +69,6 @@ export default function Dashboard() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  // AI Assistant States
-  const [showAIChat, setShowAIChat] = useState(false);
-  const [aiMessage, setAiMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<any[]>([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [isAiListening, setIsAiListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
-
-  const startAiListening = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Reconhecimento de voz não suportado neste navegador.');
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'pt-BR';
-    recognition.onstart = () => setIsAiListening(true);
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setAiMessage(transcript);
-      // Enviar automaticamente após um pequeno delay para o usuário ver o texto
-      setTimeout(() => {
-        handleSendMessageDirect(transcript);
-      }, 500);
-    };
-    recognition.onerror = () => setIsAiListening(false);
-    recognition.onend = () => setIsAiListening(false);
-    recognition.start();
-  };
-
-  const handleSendMessageDirect = async (messageText: string) => {
-    if (!messageText.trim() || aiLoading) return;
-
-    const userMsg = { role: 'user', content: messageText };
-    setChatHistory(prev => [...prev, userMsg]);
-    setAiMessage('');
-    setAiLoading(true);
-
-    try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: messageText, history: chatHistory }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setChatHistory(prev => [...prev, { role: 'assistant', content: data.text }]);
-      } else {
-        setChatHistory(prev => [...prev, { role: 'assistant', content: 'Ops: ' + data.error }]);
-      }
-    } catch (error) {
-      setChatHistory(prev => [...prev, { role: 'assistant', content: 'Erro de conexão.' }]);
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  const speakMessage = (text: string, msgId: string) => {
-    if (!('speechSynthesis' in window)) {
-      alert('Seu navegador não suporta leitura de texto.');
-      return;
-    }
-
-    if (isSpeaking === msgId) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(null);
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-
-    const cleanText = text
-      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F1E6}-\u{1F1FF}]/gu, '') // Emojis
-      .replace(/\*\*|\*/g, '') // Markdown
-      .replace(/[#/_\\-]/g, ' ') // Caracteres especiais por espaço
-      .replace(/\s+/g, ' ') // Espaços duplos
-      .trim();
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = 'pt-BR';
-    
-    const voices = window.speechSynthesis.getVoices();
-    const femaleVoice = voices.find(v => 
-      v.lang.includes('pt') && 
-      (v.name.toLowerCase().includes('maria') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('female'))
-    );
-    
-    if (femaleVoice) utterance.voice = femaleVoice;
-    utterance.pitch = 1.15;
-    utterance.rate = 1.25; // Velocidade mais natural e amigável
-
-    utterance.onstart = () => setIsSpeaking(msgId);
-    utterance.onend = () => setIsSpeaking(null);
-    utterance.onerror = () => setIsSpeaking(null);
-
-    window.speechSynthesis.speak(utterance);
-  };
-
   const fetchData = async () => {
     try {
       const [ridesRes, vehicleRes] = await Promise.all([
@@ -261,10 +162,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    handleSendMessageDirect(aiMessage);
-  };
+
 
   // Filtragem por período (apenas sessões fechadas para as estatísticas principais)
   const closedRides = rides.filter(r => r.status === 'closed');

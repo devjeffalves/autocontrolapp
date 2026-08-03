@@ -149,7 +149,7 @@ export default function Historico() {
     let totalKm = 0;
 
     history.forEach(r => {
-      const kmTotal = (r.kmEnd || 0) - r.kmStart;
+      const kmTotal = r.kmTotal || Math.max(0, (r.kmEnd || r.kmStart || 0) - r.kmStart);
       const rideLitres = r.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
       totalLitres += rideLitres;
       totalKm += kmTotal;
@@ -235,7 +235,8 @@ export default function Historico() {
         const query = searchQuery.toLowerCase();
         const platformMatch = item.platform?.toLowerCase().includes(query);
         const earningsMatch = (item.earnings || 0).toString().includes(query);
-        const kmMatch = ((item.kmEnd || 0) - item.kmStart).toString().includes(query);
+        const itemKmTotal = item.kmTotal || Math.max(0, (item.kmEnd || item.kmStart || 0) - item.kmStart);
+        const kmMatch = itemKmTotal.toString().includes(query);
         const dateMatch = itemDate.toLocaleDateString('pt-BR').includes(query);
         
         if (!platformMatch && !earningsMatch && !kmMatch && !dateMatch) {
@@ -246,7 +247,7 @@ export default function Historico() {
       return true;
     }).sort((a, b) => {
       const getLucro = (r: any) => {
-        const itemKm = (r.kmEnd || 0) - r.kmStart;
+        const itemKm = r.kmTotal || Math.max(0, (r.kmEnd || r.kmStart || 0) - r.kmStart);
         const fuelCost = (itemKm / globalConsumptionNum) * avgFuelPrice;
         return (r.earnings || 0) - fuelCost;
       };
@@ -260,7 +261,9 @@ export default function Historico() {
       } else if (sortBy === 'lucro_desc') {
         return getLucro(b) - getLucro(a);
       } else if (sortBy === 'km_desc') {
-        return ((b.kmEnd || 0) - b.kmStart) - ((a.kmEnd || 0) - a.kmStart);
+        const kmA = a.kmTotal || Math.max(0, (a.kmEnd || a.kmStart || 0) - a.kmStart);
+        const kmB = b.kmTotal || Math.max(0, (b.kmEnd || b.kmStart || 0) - b.kmStart);
+        return kmB - kmA;
       }
       return 0;
     });
@@ -276,7 +279,7 @@ export default function Historico() {
     let totalRides = 0;
 
     filteredHistory.forEach(item => {
-      const itemKm = (item.kmEnd || 0) - item.kmStart;
+      const itemKm = item.kmTotal || Math.max(0, (item.kmEnd || item.kmStart || 0) - item.kmStart);
       totalKm += itemKm;
       
       if (item.platform !== 'Passeio') {
@@ -290,10 +293,8 @@ export default function Historico() {
       });
 
       if (item.startTime && item.endTime) {
-        const diffMs = new Date(item.endTime).getTime() - new Date(item.startTime).getTime();
-        if (diffMs > 0) {
-          totalHours += diffMs / (1000 * 60 * 60);
-        }
+        const diffMin = calculateWorkingMinutes(item.startTime, item.endTime, item.pauses);
+        totalHours += diffMin / 60;
       }
     });
 
