@@ -124,3 +124,38 @@ export function formatDatePtBR(dateInput: Date | string | number): string {
     return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 }
+
+interface IPause {
+  startTime: Date | string;
+  endTime?: Date | string;
+}
+
+/**
+ * Calcula a duração líquida de trabalho (em minutos), subtraindo o tempo decorrido de todas as pausas registradas.
+ */
+export function calculateWorkingMinutes(
+  startTime: Date | string | number,
+  endTime: Date | string | number | null | undefined,
+  pauses?: IPause[]
+): number {
+  if (!startTime) return 0;
+  
+  const startMs = new Date(startTime).getTime();
+  const endMs = endTime ? new Date(endTime).getTime() : Date.now();
+  
+  if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) return 0;
+  
+  const totalDiffMs = endMs - startMs;
+  
+  const totalPauseMs = (pauses || []).reduce((pAcc: number, p: IPause) => {
+    if (!p.startTime) return pAcc;
+    const pStart = new Date(p.startTime).getTime();
+    const pEnd = p.endTime ? new Date(p.endTime).getTime() : Date.now();
+    if (isNaN(pStart) || isNaN(pEnd)) return pAcc;
+    return pAcc + Math.max(0, pEnd - pStart);
+  }, 0);
+  
+  const workingMs = Math.max(0, totalDiffMs - totalPauseMs);
+  return Math.round(workingMs / 60000);
+}
+

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, PlusCircle, History, Car, Sparkles } from 'lucide-react';
@@ -8,6 +8,30 @@ import { motion } from 'framer-motion';
 
 const BottomNav = () => {
   const pathname = usePathname();
+  const [hasActiveShift, setHasActiveShift] = useState(false);
+
+  useEffect(() => {
+    const checkActiveShift = async () => {
+      try {
+        const res = await fetch('/api/rides?status=open');
+        const json = await res.json();
+        if (json.success && json.data && json.data.length > 0) {
+          setHasActiveShift(true);
+        } else {
+          setHasActiveShift(false);
+        }
+      } catch (e) {
+        console.error('Erro ao verificar turno ativo no BottomNav:', e);
+      }
+    };
+    
+    checkActiveShift();
+    
+    window.addEventListener('shift-state-changed', checkActiveShift);
+    return () => {
+      window.removeEventListener('shift-state-changed', checkActiveShift);
+    };
+  }, [pathname]);
 
   const navItems = [
     { name: 'Início', href: '/', icon: LayoutDashboard },
@@ -43,6 +67,9 @@ const BottomNav = () => {
             <Link key={item.href} href={item.href} className={`nav-item ${isActive ? 'active' : ''}`}>
               <div className="icon-wrapper">
                 <item.icon size={24} />
+                {item.href === '/novo' && hasActiveShift && (
+                  <span className="active-shift-badge-pulse" />
+                )}
                 {isActive && (
                   <motion.div
                     layoutId="nav-glow"

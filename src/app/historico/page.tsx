@@ -7,7 +7,7 @@ import {
   Fuel, Gauge, Clock, Award, ChevronDown, Check, ChevronUp, Coffee, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR, calculateWorkingMinutes } from '@/lib/dateUtils';
 
 export default function Historico() {
   const [history, setHistory] = useState<any[]>([]);
@@ -701,8 +701,7 @@ export default function Historico() {
                   let durationStr = '';
                   let hoursDecimal = 0;
                   if (item.startTime && item.endTime) {
-                    const diffMs = new Date(item.endTime).getTime() - new Date(item.startTime).getTime();
-                    const diffMin = Math.max(0, Math.round(diffMs / 60000));
+                    const diffMin = calculateWorkingMinutes(item.startTime, item.endTime, item.pauses);
                     const h = Math.floor(diffMin / 60);
                     const m = diffMin % 60;
                     durationStr = h > 0 ? `${h}h ${m}m` : `${m}m`;

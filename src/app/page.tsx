@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock } from 'lucide-react';
 import Link from 'next/link';
 import FuelReserveCard from '@/components/FuelReserveCard';
-import { dateToLocalInputValue, formatTimePtBR } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, calculateWorkingMinutes } from '@/lib/dateUtils';
 
 export default function Dashboard() {
   const getCurrentISOWeek = () => {
@@ -208,6 +208,7 @@ export default function Dashboard() {
       const data = await res.json();
       if (data.success) {
         setRides(rides.filter(item => item._id !== id));
+        window.dispatchEvent(new CustomEvent('shift-state-changed'));
       } else {
         alert('Erro ao cancelar: ' + data.error);
       }
@@ -396,34 +397,9 @@ export default function Dashboard() {
   // Cálculo de carga horária acumulada no período filtrado (subtraindo pausas e resolvendo fallbacks de término)
   const totalMinutes = filteredRides.reduce((acc, curr) => {
     const sVal = curr.startTime || curr.date || curr.createdAt;
-    
-    let eVal = curr.endTime;
-    if (!eVal && curr.pauses && curr.pauses.length > 0) {
-      const lastP = curr.pauses[curr.pauses.length - 1];
-      eVal = lastP.endTime || lastP.startTime;
-    }
-    if (!eVal) {
-      eVal = curr.updatedAt || curr.createdAt;
-    }
-
-    if (sVal && eVal) {
-      const startMs = new Date(sVal).getTime();
-      const endMs = new Date(eVal).getTime();
-      if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
-        const totalDiffMs = endMs - startMs;
-        const totalPauseMs = (curr.pauses || []).reduce((pAcc: number, p: any) => {
-          if (!p.startTime) return pAcc;
-          const pStart = new Date(p.startTime).getTime();
-          const pEnd = p.endTime ? new Date(p.endTime).getTime() : pStart;
-          if (isNaN(pStart) || isNaN(pEnd)) return pAcc;
-          return pAcc + Math.max(0, pEnd - pStart);
-        }, 0);
-        const workingMs = Math.max(0, totalDiffMs - totalPauseMs);
-        const diffMin = Math.round(workingMs / 60000);
-        return acc + diffMin;
-      }
-    }
-    return acc;
+    const eVal = curr.endTime || curr.updatedAt || curr.createdAt;
+    const diffMin = calculateWorkingMinutes(sVal, eVal, curr.pauses);
+    return acc + diffMin;
   }, 0);
 
   const formatDuration = (totalMin: number) => {

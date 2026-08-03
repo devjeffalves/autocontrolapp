@@ -9,15 +9,18 @@ export async function GET() {
     let vehicle = await Vehicle.findOne({});
     
     if (vehicle) {
-      // Sincronizar o KM atual do veículo com o KM final do último turno se este for superior ao cadastrado
-      const latestRide = await Ride.findOne({}).sort({ endTime: -1, date: -1 });
-      if (latestRide) {
-        const latestRideKm = latestRide.kmEnd || latestRide.kmStart;
-        if (latestRideKm && latestRideKm > vehicle.currentKm) {
-          vehicle.currentKm = latestRideKm;
-          vehicle.lastUpdated = new Date();
-          await vehicle.save();
-        }
+      // Sincronizar o KM atual com o maior valor entre todos os kmEnd e kmStart no sistema (se superior)
+      const maxKmEndRide = await Ride.findOne({ kmEnd: { $exists: true, $ne: null } }).sort({ kmEnd: -1 });
+      const maxKmStartRide = await Ride.findOne({ kmStart: { $exists: true, $ne: null } }).sort({ kmStart: -1 });
+      
+      const maxKmEnd = maxKmEndRide ? (maxKmEndRide.kmEnd || 0) : 0;
+      const maxKmStart = maxKmStartRide ? (maxKmStartRide.kmStart || 0) : 0;
+      const systemMaxKm = Math.max(maxKmEnd, maxKmStart);
+
+      if (systemMaxKm > vehicle.currentKm) {
+        vehicle.currentKm = systemMaxKm;
+        vehicle.lastUpdated = new Date();
+        await vehicle.save();
       }
     }
 

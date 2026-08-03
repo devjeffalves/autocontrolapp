@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus, Mic, MicOff, Pause, Coffee } from 'lucide-react';
 import Link from 'next/link';
-import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR, calculateWorkingMinutes } from '@/lib/dateUtils';
 
 export default function NovoRegistro() {
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -233,6 +233,7 @@ export default function NovoRegistro() {
       if (json.success) {
         setNotification({ type: 'success', message: 'Dia iniciado com sucesso!' });
         fetchActiveSession();
+        window.dispatchEvent(new CustomEvent('shift-state-changed'));
       } else {
         setNotification({ type: 'error', message: json.error });
       }
@@ -308,6 +309,7 @@ export default function NovoRegistro() {
           message: isPaused ? 'Turno retomado! ▶️' : 'Turno pausado! ⏸️' 
         });
         fetchActiveSession();
+        window.dispatchEvent(new CustomEvent('shift-state-changed'));
       } else {
         setNotification({ type: 'error', message: json.error });
       }
@@ -336,6 +338,7 @@ export default function NovoRegistro() {
         setNotification({ type: 'success', message: 'Dia finalizado e salvo com sucesso!' });
         setActiveSession(null);
         fetchActiveSession();
+        window.dispatchEvent(new CustomEvent('shift-state-changed'));
       } else {
         setNotification({ type: 'error', message: json.error });
       }
@@ -576,6 +579,7 @@ export default function NovoRegistro() {
                           setNotification({ type: 'success', message: 'Turno excluído com sucesso!' });
                           setActiveSession(null);
                           fetchActiveSession();
+                          window.dispatchEvent(new CustomEvent('shift-state-changed'));
                         } else {
                           setNotification({ type: 'error', message: json.error });
                         }
@@ -749,10 +753,11 @@ export default function NovoRegistro() {
                   </div>
                 )}
                 {(() => {
-                  const start = new Date(activeSession.startTime || activeSession.date);
-                  const end = new Date(finishData.endTime);
-                  const diffMs = end.getTime() - start.getTime();
-                  const diffMin = Math.round(diffMs / 60000);
+                  const diffMin = calculateWorkingMinutes(
+                    activeSession.startTime || activeSession.date,
+                    finishData.endTime,
+                    activeSession.pauses
+                  );
                   if (diffMin > 0) {
                     const hours = Math.floor(diffMin / 60);
                     const mins = diffMin % 60;

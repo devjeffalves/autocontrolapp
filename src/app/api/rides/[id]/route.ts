@@ -43,9 +43,15 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Registro não encontrado' }, { status: 404 });
     }
 
-    // Sincronizar KM do veículo se o novo kmEnd for superior
-    if (body.kmEnd && Number(body.kmEnd) > 0) {
-      await Vehicle.findOneAndUpdate({}, { $max: { currentKm: Number(body.kmEnd) } });
+    // Sincronizar/Recalcular KM do veículo com base em todas as corridas do banco de dados
+    const maxKmEndRide = await Ride.findOne({ kmEnd: { $exists: true, $ne: null } }).sort({ kmEnd: -1 });
+    const maxKmStartRide = await Ride.findOne({ kmStart: { $exists: true, $ne: null } }).sort({ kmStart: -1 });
+    const systemMaxKm = Math.max(
+      maxKmEndRide ? (maxKmEndRide.kmEnd || 0) : 0,
+      maxKmStartRide ? (maxKmStartRide.kmStart || 0) : 0
+    );
+    if (systemMaxKm > 0) {
+      await Vehicle.findOneAndUpdate({}, { currentKm: systemMaxKm, lastUpdated: new Date() });
     }
 
     return NextResponse.json({ success: true, data: updatedRide });
@@ -67,6 +73,15 @@ export async function DELETE(
     if (!deletedRide) {
       return NextResponse.json({ success: false, error: 'Registro não encontrado' }, { status: 404 });
     }
+
+    // Recalcular e atualizar o KM atual do veículo com base nas corridas restantes
+    const maxKmEndRide = await Ride.findOne({ kmEnd: { $exists: true, $ne: null } }).sort({ kmEnd: -1 });
+    const maxKmStartRide = await Ride.findOne({ kmStart: { $exists: true, $ne: null } }).sort({ kmStart: -1 });
+    const systemMaxKm = Math.max(
+      maxKmEndRide ? (maxKmEndRide.kmEnd || 0) : 0,
+      maxKmStartRide ? (maxKmStartRide.kmStart || 0) : 0
+    );
+    await Vehicle.findOneAndUpdate({}, { currentKm: systemMaxKm > 0 ? systemMaxKm : 0, lastUpdated: new Date() });
 
     return NextResponse.json({ success: true, data: {} });
   } catch (error: any) {
