@@ -3,6 +3,7 @@ import Groq from 'groq-sdk';
 import dbConnect from '@/lib/mongodb';
 import Ride from '@/models/Ride';
 import Vehicle from '@/models/Vehicle';
+import { calculateWorkingMinutes, formatDuration } from '@/lib/dateUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,24 +71,11 @@ export async function POST(request: NextRequest) {
       const fuelCostConsumed = (kmTotal / vehicleAvgConsumption) * rideFuelPrice;
       const lucro = (r.platform === 'Passeio') ? 0 : ((r.earnings || 0) - fuelCostConsumed);
 
-      let diffHours = 0;
-      let rideDurationStr = "Não informada";
-      if (r.startTime && r.endTime) {
-        const totalDiffMs = new Date(r.endTime).getTime() - new Date(r.startTime).getTime();
-        const totalPauseMs = (r.pauses || []).reduce((acc: number, p: any) => {
-          const pStart = new Date(p.startTime).getTime();
-          const pEnd = p.endTime ? new Date(p.endTime).getTime() : pStart;
-          return acc + Math.max(0, pEnd - pStart);
-        }, 0);
-        const workingMs = Math.max(0, totalDiffMs - totalPauseMs);
-        diffHours = workingMs / (1000 * 60 * 60);
-        const diffMin = Math.round(workingMs / 60000);
-        if (diffMin > 0) {
-          const hours = Math.floor(diffMin / 60);
-          const mins = diffMin % 60;
-          rideDurationStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-        }
-      }
+      const sVal = r.startTime || r.date || r.createdAt;
+      const eVal = r.endTime || (r.status === 'closed' ? (r.updatedAt || r.createdAt) : null);
+      const diffMin = calculateWorkingMinutes(sVal, eVal, r.pauses);
+      const diffHours = diffMin / 60;
+      const rideDurationStr = diffMin > 0 ? formatDuration(diffMin) : "Não informada";
 
       // Agrupamento mensal
       const d = new Date(r.date || r.createdAt);
@@ -169,16 +157,10 @@ export async function POST(request: NextRequest) {
       const fuelCostConsumed = (kmTotal / vehicleAvgConsumption) * rideFuelPrice;
       const lucro = (r.earnings || 0) - fuelCostConsumed;
 
-      let diffHours = 0;
-      if (r.startTime && r.endTime) {
-        const totalDiffMs = new Date(r.endTime).getTime() - new Date(r.startTime).getTime();
-        const totalPauseMs = (r.pauses || []).reduce((acc: number, p: any) => {
-          const pStart = new Date(p.startTime).getTime();
-          const pEnd = p.endTime ? new Date(p.endTime).getTime() : pStart;
-          return acc + Math.max(0, pEnd - pStart);
-        }, 0);
-        diffHours = Math.max(0, (totalDiffMs - totalPauseMs)) / (1000 * 60 * 60);
-      }
+      const sVal = r.startTime || r.date || r.createdAt;
+      const eVal = r.endTime || (r.status === 'closed' ? (r.updatedAt || r.createdAt) : null);
+      const diffMin = calculateWorkingMinutes(sVal, eVal, r.pauses);
+      const diffHours = diffMin / 60;
 
       if (weekdaySummary[dayName]) {
         weekdaySummary[dayName].faturamentoTotal += (r.earnings || 0);

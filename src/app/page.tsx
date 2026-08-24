@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock } from 'lucide-react';
 import Link from 'next/link';
 import FuelReserveCard from '@/components/FuelReserveCard';
-import { dateToLocalInputValue, formatTimePtBR, calculateWorkingMinutes } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, calculateWorkingMinutes, formatDuration } from '@/lib/dateUtils';
 
 export default function Dashboard() {
   const getCurrentISOWeek = () => {
@@ -164,12 +164,11 @@ export default function Dashboard() {
 
 
 
-  // Filtragem por período (apenas sessões fechadas para as estatísticas principais)
+  // Filtragem por período e suporte a sessões ativas (abertas ou em pausa)
   const closedRides = rides.filter(r => r.status === 'closed');
-  const activeSession = rides.find(r => r.status === 'open');
+  const activeSession = rides.find(r => r.status === 'open' || r.status === 'paused');
 
-  const filteredRides = closedRides.filter(ride => {
-    const rawDate = ride.date || ride.startTime || ride.createdAt;
+  const isRideInPeriod = (rawDate: any) => {
     if (!rawDate) return false;
     const rideDate = new Date(rawDate);
     if (isNaN(rideDate.getTime())) return false;
@@ -203,6 +202,10 @@ export default function Dashboard() {
       return rideDate.getFullYear() === now.getFullYear();
     }
     return true; // 'Tudo'
+  };
+
+  const filteredRides = closedRides.filter(ride => {
+    return isRideInPeriod(ride.date || ride.startTime || ride.createdAt);
   });
 
   // Cálculos baseados nos dados filtrados
@@ -292,22 +295,24 @@ export default function Dashboard() {
   // Custo estimado de combustível para a distância percorrida no período
   const estimatedFuelCost = totalKm > 0 ? (totalKm / realAvgConsumptionNum) * avgFuelPrice : 0;
   
-  // Cálculo de carga horária acumulada no período filtrado (subtraindo pausas e resolvendo fallbacks de término)
-  const totalMinutes = filteredRides.reduce((acc, curr) => {
+  // Cálculo de carga horária acumulada no período filtrado (incluindo corridas fechadas + turno ativo se pertencer ao período)
+  const closedMinutes = filteredRides.reduce((acc, curr) => {
     const sVal = curr.startTime || curr.date || curr.createdAt;
     const eVal = curr.endTime || curr.updatedAt || curr.createdAt;
     const diffMin = calculateWorkingMinutes(sVal, eVal, curr.pauses);
     return acc + diffMin;
   }, 0);
 
-  const formatDuration = (totalMin: number) => {
-    const hours = Math.floor(totalMin / 60);
-    const mins = totalMin % 60;
-    if (hours > 0) {
-      return `${hours}h ${mins}m`;
+  let activeMinutes = 0;
+  if (activeSession) {
+    const rawDate = activeSession.date || activeSession.startTime || activeSession.createdAt;
+    if (isRideInPeriod(rawDate)) {
+      const sVal = activeSession.startTime || activeSession.date || activeSession.createdAt;
+      activeMinutes = calculateWorkingMinutes(sVal, null, activeSession.pauses);
     }
-    return `${mins}m`;
-  };
+  }
+
+  const totalMinutes = closedMinutes + activeMinutes;
 
   const formatForDateTimeInput = (dateVal: any) => {
     if (!dateVal) return '';
@@ -594,13 +599,22 @@ export default function Dashboard() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="active-alert card"
+          className={`active-alert card ${activeSession.status === 'paused' ? 'paused' : ''}`}
         >
           <div className="alert-content">
-            <div className="pulse-icon" />
+            <div className="pulse-icon" style={{ backgroundColor: activeSession.status === 'paused' ? '#f59e0b' : undefined }} />
             <div>
-              <h3 className="alert-title">Turno em andamento</h3>
-              <p className="alert-desc">Iniciado às {formatTimePtBR(activeSession.startTime || activeSession.date)} • {activeSession.kmStart} KM</p>
+              <h3 className="alert-title">
+                {activeSession.status === 'paused' ? 'Turno em pausa ⏸️' : 'Turno em andamento 🟢'}
+              </h3>
+              <p className="alert-desc">
+                Iniciado às {formatTimePtBR(activeSession.startTime || activeSession.date)} • {activeSession.kmStart} KM
+                {(() => {
+                  const sVal = activeSession.startTime || activeSession.date;
+                  const activeMin = calculateWorkingMinutes(sVal, null, activeSession.pauses);
+                  return activeMin > 0 ? ` • ${formatDuration(activeMin)} rodados` : '';
+                })()}
+              </p>
             </div>
           </div>
           <div className="alert-actions">

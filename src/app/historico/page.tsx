@@ -7,7 +7,7 @@ import {
   Fuel, Gauge, Clock, Award, ChevronDown, Check, ChevronUp, Coffee, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR, calculateWorkingMinutes } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR, calculateWorkingMinutes, formatDuration } from '@/lib/dateUtils';
 
 export default function Historico() {
   const [history, setHistory] = useState<any[]>([]);
@@ -292,8 +292,10 @@ export default function Historico() {
         totalFuelLitres += f.litres || 0;
       });
 
-      if (item.startTime && item.endTime) {
-        const diffMin = calculateWorkingMinutes(item.startTime, item.endTime, item.pauses);
+      const sVal = item.startTime || item.date || item.createdAt;
+      const eVal = item.endTime || item.updatedAt || item.createdAt;
+      if (sVal && eVal) {
+        const diffMin = calculateWorkingMinutes(sVal, eVal, item.pauses);
         totalHours += diffMin / 60;
       }
     });
@@ -701,11 +703,11 @@ export default function Historico() {
                   // Horários e Duração
                   let durationStr = '';
                   let hoursDecimal = 0;
-                  if (item.startTime && item.endTime) {
-                    const diffMin = calculateWorkingMinutes(item.startTime, item.endTime, item.pauses);
-                    const h = Math.floor(diffMin / 60);
-                    const m = diffMin % 60;
-                    durationStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+                  const sVal = item.startTime || item.date;
+                  const eVal = item.endTime || item.updatedAt;
+                  if (sVal && eVal) {
+                    const diffMin = calculateWorkingMinutes(sVal, eVal, item.pauses);
+                    durationStr = formatDuration(diffMin);
                     hoursDecimal = diffMin > 0 ? diffMin / 60 : 0;
                   }
 
@@ -737,9 +739,9 @@ export default function Historico() {
                         <div className="date-group">
                           <Calendar size={14} className="text-muted" />
                           <span className="date-text">{formatDatePtBR(item.date)}</span>
-                          {startTimeStr && endTimeStr && (
+                          {startTimeStr && (
                             <span className="time-badge">
-                              <Clock size={12} /> {startTimeStr} às {endTimeStr} ({durationStr})
+                              <Clock size={12} /> {startTimeStr} {endTimeStr ? `às ${endTimeStr}` : ''} ({durationStr})
                             </span>
                           )}
                         </div>
