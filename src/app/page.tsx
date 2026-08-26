@@ -299,7 +299,7 @@ export default function Dashboard() {
   const closedMinutes = filteredRides.reduce((acc, curr) => {
     const sVal = curr.startTime || curr.date || curr.createdAt;
     const eVal = curr.endTime || curr.updatedAt || curr.createdAt;
-    const diffMin = calculateWorkingMinutes(sVal, eVal, curr.pauses);
+    const diffMin = calculateWorkingMinutes(sVal, eVal, curr.pauses, curr.rides, curr.kmTotal);
     return acc + diffMin;
   }, 0);
 

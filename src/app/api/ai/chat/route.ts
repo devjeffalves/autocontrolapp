@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
       const sVal = r.startTime || r.date || r.createdAt;
       const eVal = r.endTime || (r.status === 'closed' ? (r.updatedAt || r.createdAt) : null);
-      const diffMin = calculateWorkingMinutes(sVal, eVal, r.pauses);
+      const diffMin = calculateWorkingMinutes(sVal, eVal, r.pauses, r.rides, r.kmTotal);
       const diffHours = diffMin / 60;
       const rideDurationStr = diffMin > 0 ? formatDuration(diffMin) : "Não informada";
 
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
 
       const sVal = r.startTime || r.date || r.createdAt;
       const eVal = r.endTime || (r.status === 'closed' ? (r.updatedAt || r.createdAt) : null);
-      const diffMin = calculateWorkingMinutes(sVal, eVal, r.pauses);
+      const diffMin = calculateWorkingMinutes(sVal, eVal, r.pauses, r.rides, r.kmTotal);
       const diffHours = diffMin / 60;
 
       if (weekdaySummary[dayName]) {

@@ -214,6 +214,22 @@ export default function AIAssistant() {
     window.speechSynthesis.speak(utterance);
   };
 
+  const parseInlineMarkdown = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+    return parts.map((part, pIdx) => {
+      if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+        return <strong key={pIdx} style={{ fontWeight: 700, color: 'inherit' }}>{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+        return <strong key={pIdx} style={{ fontWeight: 700, color: '#2563eb' }}>{part.slice(1, -1)}</strong>;
+      }
+      if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        return <code key={pIdx} style={{ background: 'rgba(0,0,0,0.06)', padding: '2px 5px', borderRadius: '4px', fontSize: '0.82rem', fontFamily: 'monospace' }}>{part.slice(1, -1)}</code>;
+      }
+      return part;
+    });
+  };
+
   const renderFormattedContent = (content: string) => {
     const lines = content.split('\n');
     return lines.map((line, idx) => {
@@ -239,23 +255,14 @@ export default function AIAssistant() {
         isBullet = true;
       }
 
-      const parts = trimmed.split(/(\*\*.*?\*\*|`.*?`)/g);
-      const formattedLine = parts.map((part, pIdx) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={pIdx} style={{ fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
-        }
-        if (part.startsWith('`') && part.endsWith('`')) {
-          return <code key={pIdx} style={{ background: 'rgba(0,0,0,0.06)', padding: '2px 5px', borderRadius: '4px', fontSize: '0.82rem', fontFamily: 'monospace' }}>{part.slice(1, -1)}</code>;
-        }
-        return part;
-      });
+      const formattedLine = parseInlineMarkdown(trimmed);
 
       if (isHeader) {
         return (
           <div key={idx} style={{ 
             fontWeight: 800, 
-            fontSize: headerLevel === 1 ? '1rem' : headerLevel === 2 ? '0.95rem' : '0.9rem', 
-            marginTop: '8px', 
+            fontSize: headerLevel === 1 ? '1.02rem' : headerLevel === 2 ? '0.96rem' : '0.9rem', 
+            marginTop: '10px', 
             marginBottom: '4px',
             color: '#0f172a',
             overflowWrap: 'anywhere',

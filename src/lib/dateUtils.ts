@@ -154,14 +154,27 @@ interface IPause {
 export function calculateWorkingMinutes(
   startTime: Date | string | number | null | undefined,
   endTime: Date | string | number | null | undefined,
-  pauses?: IPause[]
+  pauses?: IPause[],
+  ridesCount?: number,
+  kmTotal?: number
 ): number {
   if (!startTime) return 0;
   
   const startMs = localInputValueToDate(startTime).getTime();
-  const endMs = endTime ? localInputValueToDate(endTime).getTime() : Date.now();
+  let endMs = endTime ? localInputValueToDate(endTime).getTime() : Date.now();
   
-  if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) return 0;
+  if (isNaN(startMs)) return 0;
+
+  // Se o horário de término for inválido ou igual ao início (ex: registros antigos sem endTime salvo), aplicar estimativa proporcional
+  if (endTime && (isNaN(endMs) || endMs <= startMs)) {
+    if (ridesCount && ridesCount > 0) {
+      endMs = startMs + Math.round(ridesCount * 22) * 60000;
+    } else if (kmTotal && kmTotal > 0) {
+      endMs = startMs + Math.max(20, Math.round((kmTotal / 25) * 60)) * 60000;
+    } else {
+      return 0;
+    }
+  }
   
   const totalDiffMs = endMs - startMs;
   
