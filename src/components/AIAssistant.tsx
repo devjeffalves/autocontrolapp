@@ -219,29 +219,64 @@ export default function AIAssistant() {
     return lines.map((line, idx) => {
       let trimmed = line.trim();
       let isBullet = false;
+      let isHeader = false;
+      let headerLevel = 0;
       
-      if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+      if (trimmed.startsWith('# ')) {
+        isHeader = true;
+        headerLevel = 1;
+        trimmed = trimmed.slice(2);
+      } else if (trimmed.startsWith('## ')) {
+        isHeader = true;
+        headerLevel = 2;
+        trimmed = trimmed.slice(3);
+      } else if (trimmed.startsWith('### ')) {
+        isHeader = true;
+        headerLevel = 3;
+        trimmed = trimmed.slice(4);
+      } else if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
         trimmed = trimmed.slice(2);
         isBullet = true;
       }
 
-      const parts = trimmed.split(/(\*\*.*?\*\*)/g);
+      const parts = trimmed.split(/(\*\*.*?\*\*|`.*?`)/g);
       const formattedLine = parts.map((part, pIdx) => {
         if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={pIdx}>{part.slice(2, -2)}</strong>;
+          return <strong key={pIdx} style={{ fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith('`') && part.endsWith('`')) {
+          return <code key={pIdx} style={{ background: 'rgba(0,0,0,0.06)', padding: '2px 5px', borderRadius: '4px', fontSize: '0.82rem', fontFamily: 'monospace' }}>{part.slice(1, -1)}</code>;
         }
         return part;
       });
 
+      if (isHeader) {
+        return (
+          <div key={idx} style={{ 
+            fontWeight: 800, 
+            fontSize: headerLevel === 1 ? '1rem' : headerLevel === 2 ? '0.95rem' : '0.9rem', 
+            marginTop: '8px', 
+            marginBottom: '4px',
+            color: '#0f172a',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+            minWidth: 0,
+            maxWidth: '100%'
+          }}>
+            {formattedLine}
+          </div>
+        );
+      }
+
       return (
         <React.Fragment key={idx}>
           {isBullet ? (
-            <div style={{ display: 'flex', gap: '8px', marginLeft: '2px', margin: '3px 0', alignItems: 'flex-start' }}>
-              <span style={{ color: '#2563eb', fontWeight: 'bold', fontSize: '0.9rem', lineHeight: '1.4' }}>•</span>
-              <div style={{ flex: 1 }}>{formattedLine}</div>
+            <div style={{ display: 'flex', gap: '8px', marginLeft: '2px', margin: '3px 0', alignItems: 'flex-start', minWidth: 0, maxWidth: '100%' }}>
+              <span style={{ color: '#2563eb', fontWeight: 'bold', fontSize: '0.9rem', lineHeight: '1.4', flexShrink: 0 }}>•</span>
+              <div style={{ flex: '1 1 0%', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', maxWidth: '100%' }}>{formattedLine}</div>
             </div>
           ) : (
-            <div>{formattedLine}</div>
+            <div style={{ overflowWrap: 'anywhere', wordBreak: 'break-word', minWidth: 0, maxWidth: '100%' }}>{formattedLine}</div>
           )}
           {idx < lines.length - 1 && !isBullet && <div style={{ height: '4px' }} />}
         </React.Fragment>
@@ -482,6 +517,7 @@ export default function AIAssistant() {
           background: rgba(15, 23, 42, 0.25);
           backdrop-filter: blur(4px);
           pointer-events: auto;
+          overflow: hidden;
         }
 
         .mobile-drag-indicator {
@@ -489,11 +525,11 @@ export default function AIAssistant() {
         }
 
         .ai-chat-drawer {
-          width: 400px;
-          max-width: calc(100vw - 48px);
+          width: 420px;
+          max-width: min(420px, calc(100vw - 32px));
           height: 560px;
-          min-height: 480px;
-          max-height: calc(100dvh - 48px);
+          min-height: 440px;
+          max-height: calc(100dvh - 32px);
           background: #ffffff;
           border-radius: 24px;
           display: flex;
@@ -503,6 +539,7 @@ export default function AIAssistant() {
           border: 1px solid rgba(226, 232, 240, 0.9);
           position: relative;
           pointer-events: auto;
+          box-sizing: border-box;
         }
 
         /* Cabeçalho Escuro e Moderno */
@@ -697,7 +734,11 @@ export default function AIAssistant() {
         .ai-chat-messages {
           flex: 1 1 0%;
           min-height: 0;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
           overflow-y: auto;
+          overflow-x: hidden;
           -webkit-overflow-scrolling: touch;
           padding: 16px;
           display: flex;
@@ -772,7 +813,13 @@ export default function AIAssistant() {
           box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
         }
 
-        .chat-bubble-container { display: flex; gap: 8px; max-width: 90%; }
+        .chat-bubble-container { 
+          display: flex; 
+          gap: 8px; 
+          max-width: 90%; 
+          min-width: 0; 
+          box-sizing: border-box;
+        }
         .chat-bubble-container.user { align-self: flex-end; flex-direction: row-reverse; }
         .chat-bubble-container.assistant { align-self: flex-start; }
 
@@ -782,6 +829,17 @@ export default function AIAssistant() {
           font-size: 0.88rem; 
           line-height: 1.5; 
           word-break: break-word;
+          overflow-wrap: anywhere;
+          min-width: 0;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+
+        .chat-bubble * {
+          max-width: 100%;
+          box-sizing: border-box;
+          word-break: break-word;
+          overflow-wrap: anywhere;
         }
         
         .chat-bubble.user { 
@@ -902,14 +960,16 @@ export default function AIAssistant() {
           }
 
           .ai-chat-drawer { 
-            height: 80%;
-            max-height: 80%;
-            width: 100%;
-            max-width: 100%;
+            height: 82dvh;
+            max-height: 82dvh;
+            width: 100vw;
+            max-width: 100vw;
             border-radius: 24px 24px 0 0; 
             border: none;
             box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.3);
-            background: #0f172a; /* Cor de fundo do cabeçalho para unificar o drag indicator */
+            background: #0f172a;
+            box-sizing: border-box;
+            overflow: hidden;
           }
 
           .ai-chat-header {
