@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import dbConnect from '@/lib/mongodb';
 import Ride from '@/models/Ride';
 import Vehicle from '@/models/Vehicle';
@@ -7,15 +8,16 @@ import { calculateWorkingMinutes, formatDuration } from '@/lib/dateUtils';
 
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
+    const groqApiKey = process.env.GROQ_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+
+    if (!groqApiKey && !geminiApiKey) {
       return NextResponse.json({ 
         success: false, 
-        error: 'GROQ_API_KEY não configurada no servidor.' 
+        error: 'Nenhuma chave de API de IA (GROQ_API_KEY ou GEMINI_API_KEY) configurada no servidor.' 
       }, { status: 500 });
     }
 
-    const groq = new Groq({ apiKey });
     const { message, history = [] } = await request.json();
 
     await dbConnect();
@@ -260,38 +262,60 @@ export async function POST(request: NextRequest) {
       4. Informar faturamento, lucro e horas exatas quando perguntado sobre qualquer período.
     `;
 
-    const targetModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
     let text = "";
 
-    try {
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...prunedHistory,
-          { role: 'user', content: message }
-        ],
-        model: targetModel,
-      });
-      text = chatCompletion.choices[0]?.message?.content || "";
-    } catch (groqErr: any) {
-      console.warn("Primeira tentativa com Groq falhou, tentando fallback minimalista...", groqErr?.message);
-      try {
-        const fallbackCompletion = await groq.chat.completions.create({
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: message }
-          ],
-          model: 'llama-3.3-70b-versatile',
-        });
-        text = fallbackCompletion.choices[0]?.message?.content || "";
-      } catch (fallbackErr: any) {
-        throw fallbackErr;
+    // 1. Tentar Groq com modelos atualizados
+    if (groqApiKey) {
+      const groq = new Groq({ apiKey: groqApiKey });
+      const candidateModels = Array.from(new Set([
+        process.env.GROQ_MODEL || 'groq/compound',
+        'openai/gpt-oss-120b',
+        'groq/compound-mini',
+        'qwen/qwen3.6-27b'
+      ]));
+
+      for (const modelCandidate of candidateModels) {
+        try {
+          const chatCompletion = await groq.chat.completions.create({
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...prunedHistory,
+              { role: 'user', content: message }
+            ],
+            model: modelCandidate,
+          });
+          const rawText = chatCompletion.choices[0]?.message?.content || "";
+          // Remover tags <think>...</think> se o modelo for de raciocínio
+          text = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+          if (text) break;
+        } catch (err: any) {
+          console.warn(`Tentativa com modelo Groq (${modelCandidate}) falhou:`, err?.message || err);
+        }
       }
+    }
+
+    // 2. Fallback para Google Gemini caso Groq falhe ou não esteja disponível
+    if (!text && geminiApiKey) {
+      try {
+        const genAI = new GoogleGenerativeAI(geminiApiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        
+        const fullPrompt = `${systemPrompt}\n\nHistórico:\n${JSON.stringify(prunedHistory)}\n\nUsuário: ${message}`;
+        const result = await model.generateContent(fullPrompt);
+        const response = await result.response;
+        text = response.text().trim();
+      } catch (geminiErr: any) {
+        console.warn('Fallback para Google Gemini também falhou:', geminiErr?.message || geminiErr);
+      }
+    }
+
+    if (!text) {
+      throw new Error('Não foi possível obter resposta de nenhum dos provedores de IA.');
     }
 
     return NextResponse.json({ success: true, text });
   } catch (error: any) {
-    console.error('Erro no Groq:', error);
+    console.error('Erro no assistente de IA:', error);
     const isRateLimit = error?.status === 413 || error?.message?.includes('TPM') || error?.message?.includes('rate_limit_exceeded');
     const userErrorMsg = isRateLimit 
       ? 'O limite temporário de requisições da IA foi atingido. Por favor, aguarde alguns instantes e tente novamente.' 
