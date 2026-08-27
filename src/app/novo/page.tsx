@@ -20,6 +20,7 @@ export default function NovoRegistro() {
   const [startData, setStartData] = useState(() => ({ kmStart: '', platform: 'Aplicativos', startTime: getLocalDateTimeString() }));
   const [fuelData, setFuelData] = useState({ fuelCost: '', fuelLitres: '', fuelKm: '' });
   const [finishData, setFinishData] = useState(() => ({ kmEnd: '', rides: '', earnings: '', platform: 'Aplicativos', endTime: getLocalDateTimeString() }));
+  const [hasUserEditedEndTime, setHasUserEditedEndTime] = useState(false);
 
   // Voice recognition states
   const [isListening, setIsListening] = useState(false);
@@ -327,16 +328,22 @@ export default function NovoRegistro() {
       return;
     }
     setSubmitting(true);
+    
+    // Se o usuário não editou manualmente o campo de horário de término, usa a hora exata da submissão
+    const currentEndTime = getLocalDateTimeString();
+    const effectiveEndTime = (hasUserEditedEndTime && finishData.endTime) ? finishData.endTime : currentEndTime;
+
     try {
       const res = await fetch('/api/rides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...finishData, action: 'finish' }),
+        body: JSON.stringify({ ...finishData, endTime: effectiveEndTime, action: 'finish' }),
       });
       const json = await res.json();
       if (json.success) {
         setNotification({ type: 'success', message: 'Dia finalizado e salvo com sucesso!' });
         setActiveSession(null);
+        setHasUserEditedEndTime(false);
         fetchActiveSession();
         window.dispatchEvent(new CustomEvent('shift-state-changed'));
       } else {
@@ -734,7 +741,10 @@ export default function NovoRegistro() {
                 <input 
                   type="datetime-local" 
                   value={finishData.endTime}
-                  onChange={e => setFinishData({...finishData, endTime: e.target.value})}
+                  onChange={e => {
+                    setHasUserEditedEndTime(true);
+                    setFinishData({...finishData, endTime: e.target.value});
+                  }}
                   required
                   disabled={submitting}
                 />

@@ -196,14 +196,21 @@ export async function POST(request: NextRequest) {
     if (body.action === 'finish') {
       const kmEnd = body.kmEnd;
       const kmTotal = kmEnd - activeSession.kmStart;
-      const endTimeVal = (body.endTime && String(body.endTime).trim()) ? parseDateInput(body.endTime) : new Date();
+      let endTimeVal = (body.endTime && String(body.endTime).trim()) ? parseDateInput(body.endTime) : new Date();
       
-      // Se estava em pausa ao fechar, fecha a última pausa
-      if (activeSession.status === 'paused' && activeSession.pauses && activeSession.pauses.length > 0) {
-        const lastPause = activeSession.pauses[activeSession.pauses.length - 1];
-        if (!lastPause.endTime) {
-          lastPause.endTime = endTimeVal;
-        }
+      const sessionStart = activeSession.startTime ? new Date(activeSession.startTime) : (activeSession.date ? new Date(activeSession.date) : new Date());
+      // Se o endTime for menor ou igual ao startTime da sessão, assume o momento atual
+      if (isNaN(endTimeVal.getTime()) || endTimeVal.getTime() <= sessionStart.getTime()) {
+        endTimeVal = new Date();
+      }
+      
+      // Fechar e validar pausas para que nenhuma pausa ultrapasse o endTime do turno
+      if (activeSession.pauses && activeSession.pauses.length > 0) {
+        activeSession.pauses.forEach((p: any) => {
+          if (!p.endTime || new Date(p.endTime).getTime() > endTimeVal.getTime()) {
+            p.endTime = endTimeVal;
+          }
+        });
       }
 
       activeSession.kmEnd = kmEnd;
