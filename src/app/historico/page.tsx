@@ -7,7 +7,7 @@ import {
   Fuel, Gauge, Clock, Award, ChevronDown, Check, ChevronUp, Coffee, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR, calculateWorkingMinutes, formatDuration } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR, calculateWorkingMinutes, formatDuration, getBrasiliaISOWeek, getBrasiliaISOMonth } from '@/lib/dateUtils';
 
 export default function Historico() {
   const [history, setHistory] = useState<any[]>([]);
@@ -20,15 +20,6 @@ export default function Historico() {
   // Estados dos Filtros
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const getCurrentISOWeek = () => {
-    const d = new Date();
-    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    const dayNum = date.getUTCDay() || 7;
-    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-    return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
-  };
 
   const getDatesFromWeekString = (weekStr: string) => {
     if (!weekStr || !weekStr.includes('-W')) return null;
@@ -53,8 +44,8 @@ export default function Historico() {
   };
 
   const [periodFilter, setPeriodFilter] = useState<'tudo' | 'hoje' | 'semana' | 'selecionar_semana' | 'mes' | 'selecionar_mes' | 'ano' | 'custom'>('tudo');
-  const [selectedWeek, setSelectedWeek] = useState(getCurrentISOWeek);
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selectedWeek, setSelectedWeek] = useState(getBrasiliaISOWeek);
+  const [selectedMonth, setSelectedMonth] = useState(getBrasiliaISOMonth);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [platformFilter, setPlatformFilter] = useState<'todos' | 'Aplicativos' | 'Passeio'>('todos');

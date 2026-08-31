@@ -5,21 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock } from 'lucide-react';
 import Link from 'next/link';
 import FuelReserveCard from '@/components/FuelReserveCard';
-import { dateToLocalInputValue, formatTimePtBR, calculateWorkingMinutes, formatDuration } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, calculateWorkingMinutes, formatDuration, getBrasiliaISOWeek, getBrasiliaISOMonth } from '@/lib/dateUtils';
 
 export default function Dashboard() {
-  const getCurrentISOWeek = () => {
-    const d = new Date();
-    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    const dayNum = date.getUTCDay() || 7;
-    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-    return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
-  };
-
-  const [selectedWeek, setSelectedWeek] = useState(getCurrentISOWeek);
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selectedWeek, setSelectedWeek] = useState(getBrasiliaISOWeek);
+  const [selectedMonth, setSelectedMonth] = useState(getBrasiliaISOMonth);
 
   const getDatesFromWeekString = (weekStr: string) => {
     if (!weekStr || !weekStr.includes('-W')) return null;
@@ -684,7 +674,7 @@ export default function Dashboard() {
                 <button className="week-nav-btn" onClick={() => navigateWeek('next')} title="Próxima Semana">►</button>
               </div>
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }} suppressHydrationWarning>
               Semana: {periodRangeStr}
             </p>
           </div>

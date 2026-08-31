@@ -196,4 +196,27 @@ export function calculateWorkingMinutes(
   return Math.round(workingMs / 60000);
 }
 
+/**
+ * Retorna o mês atual (YYYY-MM) no fuso horário de Brasília (America/Sao_Paulo).
+ */
+export function getBrasiliaISOMonth(): string {
+  const dateStr = dateToLocalInputValue(new Date());
+  return dateStr.slice(0, 7);
+}
+
+/**
+ * Retorna a semana ISO atual (YYYY-Www) no fuso horário de Brasília (America/Sao_Paulo).
+ */
+export function getBrasiliaISOWeek(): string {
+  const dateStr = dateToLocalInputValue(new Date());
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+
 

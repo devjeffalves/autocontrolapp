@@ -27,11 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <main className="container safe-area-top">
           {children}
           <div style={{ height: "100px" }} /> {/* Spacer for BottomNav */}
