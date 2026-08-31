@@ -7,7 +7,7 @@ import {
   Fuel, Gauge, Clock, Award, ChevronDown, Check, ChevronUp, Coffee, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR, calculateWorkingMinutes, formatDuration, getBrasiliaISOWeek, getBrasiliaISOMonth } from '@/lib/dateUtils';
+import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR, calculateWorkingMinutes, formatDuration, getBrasiliaISOWeek, getBrasiliaISOMonth, localInputValueToDate } from '@/lib/dateUtils';
 
 export default function Historico() {
   const [history, setHistory] = useState<any[]>([]);
@@ -128,7 +128,8 @@ export default function Historico() {
     setPeriodFilter('tudo');
     setStartDate('');
     setEndDate('');
-    setSelectedMonth(new Date().toISOString().slice(0, 7));
+    setSelectedMonth(getBrasiliaISOMonth());
+    setSelectedWeek(getBrasiliaISOWeek());
     setPlatformFilter('todos');
     setSortBy('recentes');
   };
@@ -167,7 +168,7 @@ export default function Historico() {
     return history.filter(item => {
       const rawDate = item.date || item.startTime || item.createdAt;
       if (!rawDate) return false;
-      const itemDate = new Date(rawDate);
+      const itemDate = localInputValueToDate(rawDate);
       if (isNaN(itemDate.getTime())) return false;
 
       // 1. Filtro por Plataforma
@@ -258,7 +259,7 @@ export default function Historico() {
       }
       return 0;
     });
-  }, [history, platformFilter, periodFilter, startDate, endDate, searchQuery, sortBy, globalConsumptionNum, avgFuelPrice]);
+  }, [history, platformFilter, periodFilter, selectedWeek, selectedMonth, startDate, endDate, searchQuery, sortBy, globalConsumptionNum, avgFuelPrice]);
 
   // Cálculo de Métricas com Base nos Filtros
   const metrics = useMemo(() => {
@@ -334,7 +335,7 @@ export default function Historico() {
     history.forEach((ride) => {
       if (ride.fuelings && ride.fuelings.length > 0) {
         ride.fuelings.forEach((f: any, fIdx: number) => {
-          const itemDate = new Date(f.date || ride.date || ride.createdAt || Date.now());
+          const itemDate = localInputValueToDate(f.date || ride.date || ride.createdAt || Date.now());
 
           // 1. Filtro por Período
           if (periodFilter === 'hoje') {
@@ -415,7 +416,7 @@ export default function Historico() {
     });
 
     return list.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [history, periodFilter, selectedMonth, startDate, endDate, searchQuery]);
+  }, [history, platformFilter, periodFilter, selectedWeek, selectedMonth, startDate, endDate, searchQuery]);
 
   const fuelMetrics = useMemo(() => {
     let totalSpent = 0;
@@ -525,7 +526,10 @@ export default function Historico() {
                     onClick={() => {
                       setPeriodFilter(p.id as any);
                       if (p.id === 'selecionar_mes' && !selectedMonth) {
-                        setSelectedMonth(new Date().toISOString().slice(0, 7));
+                        setSelectedMonth(getBrasiliaISOMonth());
+                      }
+                      if (p.id === 'selecionar_semana' && !selectedWeek) {
+                        setSelectedWeek(getBrasiliaISOWeek());
                       }
                     }}
                   >
