@@ -305,3 +305,443 @@ p { line-height: 1.6; color: var(--text-muted); }
   }
 }
 
+/* ==========================================================================
+   Calculadora de Custos & Lucro Styles (Visual Fiel às Imagens)
+   ========================================================================== */
+.calc-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 90px;
+}
+
+.calc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 8px 0;
+}
+
+.calc-title-group h1 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.calc-title-group p {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.calc-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--card-border);
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.calc-icon-btn:hover {
+  background: #f1f5f9;
+}
+
+.calc-save-btn {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+}
+
+/* Nav Tabs (Detalhes vs Configurar) */
+.calc-nav-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  background: #e2e8f0;
+  border-radius: 16px;
+  gap: 4px;
+}
+
+.calc-tab-btn {
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.calc-tab-btn.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.calc-tab-btn.active svg {
+  color: #ea580c;
+}
+
+/* Period Switcher (Dia | Semana | Mês) */
+.calc-period-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  padding: 8px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+}
+
+.calc-period-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.calc-period-selector {
+  display: flex;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 12px;
+  gap: 2px;
+}
+
+.calc-period-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.calc-period-btn.active {
+  background: #ffffff;
+  color: #ea580c;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Profit Main Card */
+.calc-profit-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 20px;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.calc-profit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calc-profit-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.calc-profit-formula {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.calc-gross-val {
+  color: #16a34a;
+}
+
+.calc-cost-val {
+  color: #dc2626;
+}
+
+.calc-profit-amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.calc-profit-amount {
+  font-size: 2.25rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.calc-margin-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* 4 Metrics Grid (2x2) */
+.calc-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.calc-metric-card {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.calc-metric-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.calc-metric-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.calc-metric-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.calc-metric-unit {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+/* Simulation Slider Box */
+.calc-simulation-box {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calc-sim-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calc-sim-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calc-sim-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #ea580c;
+  background: #fff7ed;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #ffedd5;
+}
+
+.calc-slider {
+  width: 100%;
+  accent-color: #ea580c;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Main CTA Button */
+.calc-cta-btn {
+  width: 100%;
+  padding: 16px;
+  background: #ea580c;
+  color: #ffffff;
+  border: none;
+  border-radius: 16px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35);
+  transition: all 0.2s ease;
+}
+
+.calc-cta-btn:hover {
+  background: #c2410c;
+  transform: translateY(-1px);
+}
+
+.calc-cta-btn:active {
+  transform: scale(0.99);
+}
+
+/* Form Pill Selectors (Rental Company & Fuel Type) */
+.calc-section-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 10px;
+}
+
+.calc-pill-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.calc-pill-btn {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1 1 calc(33.33% - 8px);
+  min-width: 75px;
+  text-align: center;
+}
+
+.calc-pill-btn.active {
+  background: #ffffff;
+  color: #ea580c;
+  border-color: #ea580c;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.15);
+}
+
+/* Form Input Enhancements for Calc */
+.calc-input-row {
+  display: flex;
+  gap: 12px;
+}
+
+.calc-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.calc-currency-prefix {
+  position: absolute;
+  left: 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.calc-input-with-prefix {
+  padding-left: 42px !important;
+}
+
+.calc-cycle-toggle {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  background: #e2e8f0;
+  padding: 2px;
+  border-radius: 8px;
+  gap: 2px;
+}
+
+.calc-cycle-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.calc-cycle-btn.active {
+  background: #ffffff;
+  color: #ea580c;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Cost Breakdown List */
+.calc-cost-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calc-cost-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.calc-cost-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.calc-cost-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.calc-cost-item-val {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+
