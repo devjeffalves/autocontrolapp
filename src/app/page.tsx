@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock } from 'lucide-react';
+import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock, Calculator } from 'lucide-react';
 import Link from 'next/link';
 import FuelReserveCard from '@/components/FuelReserveCard';
 import { dateToLocalInputValue, formatTimePtBR, calculateWorkingMinutes, formatDuration, getBrasiliaISOWeek, getBrasiliaISOMonth } from '@/lib/dateUtils';
@@ -663,6 +663,35 @@ export default function Dashboard() {
           </motion.div>
         ))}
       </section>
+
+      {/* Banner Calculadora de Custos & Lucro */}
+      <motion.section 
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="card bg-gradient-to-r from-amber-500/10 via-slate-900/5 to-amber-500/10 border border-amber-500/30 p-4 rounded-2xl shadow-sm my-4"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-gradient-to-tr from-amber-500 to-amber-600 text-white rounded-xl shadow-md">
+              <Calculator size={22} />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                Calculadora de Custos & Lucro
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Calcule custo por Km, $/Hora e simule metas de ganhos maiores
+              </p>
+            </div>
+          </div>
+          <Link 
+            href="/calculadora" 
+            className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all whitespace-nowrap"
+          >
+            Acessar
+          </Link>
+        </div>
+      </motion.section>
 
       <section className="chart-section card">
         <div className="section-header" style={{ marginBottom: '8px' }}>

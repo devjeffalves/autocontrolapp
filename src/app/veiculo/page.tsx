@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Car, Settings, Fuel, Activity, PenLine, Save, X, Plus, Trash2, Camera, Calendar, ChevronRight } from 'lucide-react';
+import { Car, Settings, Fuel, Activity, PenLine, Save, X, Plus, Trash2, Camera, Calendar, ChevronRight, Calculator } from 'lucide-react';
 import Link from 'next/link';
 import FuelReserveCard from '@/components/FuelReserveCard';
 
@@ -344,6 +344,27 @@ export default function Veiculo() {
               ⚠️ Média inconsistente ({displayAvg.toFixed(1)} km/L). Certifique-se de registrar todos os abastecimentos.
             </p>
           )}
+        </div>
+      </section>
+
+      {/* Calculadora de Custos Card */}
+      <section className="card bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-slate-900/5 border border-amber-500/30 p-5 rounded-2xl shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-amber-500 text-white rounded-xl shadow-md">
+              <Calculator size={24} />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">Calculadora de Custos</h3>
+              <p className="text-xs text-slate-500 font-medium">Defina aluguel, metas e calcule Custo/Km e $/Hora</p>
+            </div>
+          </div>
+          <Link 
+            href="/calculadora" 
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1"
+          >
+            Abrir <ChevronRight size={16} />
+          </Link>
         </div>
       </section>
 
