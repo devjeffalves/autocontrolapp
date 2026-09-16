@@ -15,6 +15,11 @@ public class AutoControlAccessibilityService extends AccessibilityService {
     private String lastProcessedText = "";
     private long lastProcessedTime = 0;
 
+    // Fast Regex Patterns for Uber, 99 & InDrive
+    private static final Pattern PRICE_PATTERN = Pattern.compile("R\\$\\s*(\\d+[.,]\\d{2})|(\\d+[.,]\\d{2})\\s*R\\$");
+    private static final Pattern KM_PATTERN = Pattern.compile("(\\d+[.,]?\\d*)\\s*km", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MIN_PATTERN = Pattern.compile("(\\d+)\\s*(?:min|m\\b)", Pattern.CASE_INSENSITIVE);
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event == null) return;
@@ -23,16 +28,26 @@ public class AutoControlAccessibilityService extends AccessibilityService {
         if (packageName == null) return;
 
         String pkg = packageName.toString();
-        if ("com.ubercab.driver".equals(pkg) || "com.taxis99.driver".equals(pkg)) {
+        // Target app packages
+        if (pkg.contains("ubercab") || pkg.contains("taxis99") || pkg.contains("indriver")) {
+            List<String> screenTexts = new ArrayList<>();
+
+            // 1. Quick check from event text (0ms latency)
+            List<CharSequence> eventTexts = event.getText();
+            if (eventTexts != null && !eventTexts.isEmpty()) {
+                for (CharSequence t : eventTexts) {
+                    if (t != null) screenTexts.add(t.toString());
+                }
+            }
+
+            // 2. Full tree check if active window node is available
             AccessibilityNodeInfo rootNode = getRootInActiveWindow();
             if (rootNode != null) {
-                List<String> screenTexts = new ArrayList<>();
                 collectTextNodes(rootNode, screenTexts);
-                rootNode.recycle();
+            }
 
-                if (!screenTexts.isEmpty()) {
-                    processScreenContent(screenTexts);
-                }
+            if (!screenTexts.isEmpty()) {
+                processScreenContent(screenTexts);
             }
         }
     }
@@ -50,11 +65,11 @@ public class AutoControlAccessibilityService extends AccessibilityService {
             texts.add(contentDesc.toString());
         }
 
-        for (int i = 0; i < node.getChildCount(); i++) {
+        int childCount = node.getChildCount();
+        for (int i = 0; i < childCount; i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child != null) {
                 collectTextNodes(child, texts);
-                child.recycle();
             }
         }
     }
@@ -63,8 +78,8 @@ public class AutoControlAccessibilityService extends AccessibilityService {
         String combinedText = TextUtils.join(" | ", texts);
         long now = System.currentTimeMillis();
 
-        // Avoid re-processing exact same offer within 5 seconds
-        if (combinedText.equals(lastProcessedText) && (now - lastProcessedTime < 5000)) {
+        // Evitar reprocessar o mesmo card no intervalo de 3 segundos
+        if (combinedText.equals(lastProcessedText) && (now - lastProcessedTime < 3000)) {
             return;
         }
 
@@ -72,33 +87,28 @@ public class AutoControlAccessibilityService extends AccessibilityService {
         double distanceKm = 0;
         double timeMinutes = 0;
 
-        // Regex patterns for Uber and 99 offer cards
-        Pattern pricePattern = Pattern.compile("R\\$\\s*(\\d+[.,]\\d{2})|(\\d+[.,]\\d{2})\\s*R\\$");
-        Pattern kmPattern = Pattern.compile("(\\d+[.,]?\\d*)\\s*km", Pattern.CASE_INSENSITIVE);
-        Pattern minPattern = Pattern.compile("(\\d+)\\s*min", Pattern.CASE_INSENSITIVE);
-
-        Matcher priceMatcher = pricePattern.matcher(combinedText);
+        Matcher priceMatcher = PRICE_PATTERN.matcher(combinedText);
         if (priceMatcher.find()) {
             String val = priceMatcher.group(1) != null ? priceMatcher.group(1) : priceMatcher.group(2);
             if (val != null) price = parseDouble(val);
         }
 
-        Matcher kmMatcher = kmPattern.matcher(combinedText);
+        Matcher kmMatcher = KM_PATTERN.matcher(combinedText);
         if (kmMatcher.find()) {
             distanceKm = parseDouble(kmMatcher.group(1));
         }
 
-        Matcher minMatcher = minPattern.matcher(combinedText);
+        Matcher minMatcher = MIN_PATTERN.matcher(combinedText);
         if (minMatcher.find()) {
             timeMinutes = parseDouble(minMatcher.group(1));
         }
 
-        // If offer data found (Price > 0 and Distance > 0)
+        // Se encontrou dados válidos da oferta (Preço > 0 e Distância > 0)
         if (price > 0 && distanceKm > 0) {
             lastProcessedText = combinedText;
             lastProcessedTime = now;
 
-            if (timeMinutes <= 0) timeMinutes = 15; // default fallback time
+            if (timeMinutes <= 0) timeMinutes = 15; // padrão de 15 minutos se não informado
 
             evaluateAndShowOverlay(price, distanceKm, timeMinutes);
         }
@@ -114,7 +124,7 @@ public class AutoControlAccessibilityService extends AccessibilityService {
     }
 
     private void evaluateAndShowOverlay(double price, double distanceKm, double timeMinutes) {
-        // Defaults parameters from AutoControl (configurable)
+        // Parâmetros de cálculo do AutoControl
         double targetRatePerKm = 2.50;
         double targetRatePerHour = 45.00;
         double minCostPerKm = 1.15;
@@ -125,16 +135,13 @@ public class AutoControlAccessibilityService extends AccessibilityService {
         double totalFuelCost = distanceKm * fuelCostPerKm;
         double netProfit = price - (distanceKm * minCostPerKm);
 
-        String status = "bad";
         String badge = "🔴 RUIM";
         String colorHex = "#ef4444";
 
         if (ratePerKm >= targetRatePerKm && ratePerHour >= targetRatePerHour && netProfit > 0) {
-            status = "good";
             badge = "🟢 BOA";
             colorHex = "#10b981";
         } else if (ratePerKm >= minCostPerKm && (ratePerKm >= targetRatePerKm || ratePerHour >= targetRatePerHour)) {
-            status = "medium";
             badge = "🟡 MEDIANA";
             colorHex = "#f59e0b";
         }

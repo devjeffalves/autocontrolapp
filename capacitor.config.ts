@@ -5,8 +5,7 @@ const config: CapacitorConfig = {
   appName: 'AutoControl',
   webDir: 'public',
   server: {
-    // Em produção na Vercel, altere para a sua URL (ex: 'https://seu-autocontrol.vercel.app')
-    url: process.env.CAPACITOR_SERVER_URL || 'http://192.168.1.80:3000',
+    url: 'https://autocontrolapp.vercel.app',
     cleartext: true,
     androidScheme: 'https',
   },
