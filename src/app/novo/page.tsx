@@ -189,22 +189,35 @@ export default function NovoRegistro() {
 
   const fetchActiveSession = async () => {
     try {
-      const [openRes, ridesRes] = await Promise.all([
+      const [openRes, ridesRes, vehicleRes] = await Promise.all([
         fetch('/api/rides?status=open'),
-        fetch('/api/rides')
+        fetch('/api/rides'),
+        fetch('/api/vehicle')
       ]);
       const json = await openRes.json();
       const ridesJson = await ridesRes.json();
+      const vehicleJson = await vehicleRes.json();
 
-      if (ridesJson.success && ridesJson.data.length > 0) {
-        const closed = ridesJson.data.filter((r: any) => r.status === 'closed');
+      if (ridesJson.success && Array.isArray(ridesJson.data) && ridesJson.data.length > 0) {
+        const closed = ridesJson.data
+          .filter((r: any) => r.status === 'closed' && (r.kmEnd || r.kmStart))
+          .sort((a: any, b: any) => {
+            const kmA = a.kmEnd || a.kmStart || 0;
+            const kmB = b.kmEnd || b.kmStart || 0;
+            return kmB - kmA;
+          });
+
+        let maxKm = 0;
         if (closed.length > 0) {
-          const last = closed[0];
-          const km = last.kmEnd || last.kmStart || 0;
-          if (km > 0) {
-            setLastKmEnd(km);
-            setStartData(prev => ({ ...prev, kmStart: prev.kmStart || String(km) }));
-          }
+          maxKm = closed[0].kmEnd || closed[0].kmStart || 0;
+        }
+        if (vehicleJson.success && vehicleJson.data?.currentKm && vehicleJson.data.currentKm > maxKm) {
+          maxKm = vehicleJson.data.currentKm;
+        }
+
+        if (maxKm > 0) {
+          setLastKmEnd(maxKm);
+          setStartData(prev => ({ ...prev, kmStart: prev.kmStart || String(maxKm) }));
         }
       }
 

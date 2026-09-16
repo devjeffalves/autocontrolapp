@@ -90,24 +90,36 @@ export async function POST(request: NextRequest) {
 
       // Se houver diferença de KM em relação ao último turno fechado e autoLogPersonalGap for true
       if (body.autoLogPersonalGap !== false) {
-        const lastClosedRide = await Ride.findOne({ status: 'closed' }).sort({ date: -1, createdAt: -1 });
+        const [lastClosedRide, vehicle] = await Promise.all([
+          Ride.findOne({
+            status: 'closed',
+            $or: [{ kmEnd: { $exists: true, $ne: null } }, { kmStart: { $exists: true, $ne: null } }]
+          }).sort({ kmEnd: -1, kmStart: -1, date: -1, createdAt: -1 }),
+          Vehicle.findOne({})
+        ]);
+
+        let lastKm = 0;
         if (lastClosedRide) {
-          const lastKm = lastClosedRide.kmEnd || lastClosedRide.kmStart || 0;
-          if (lastKm > 0 && newKmStart > lastKm) {
-            const gapKm = newKmStart - lastKm;
-            await Ride.create({
-              platform: 'Passeio',
-              rides: 0,
-              earnings: 0,
-              kmStart: lastKm,
-              kmEnd: newKmStart,
-              kmTotal: gapKm,
-              status: 'closed',
-              date: startTimeVal,
-              startTime: startTimeVal,
-              endTime: startTimeVal
-            });
-          }
+          lastKm = lastClosedRide.kmEnd || lastClosedRide.kmStart || 0;
+        }
+        if (vehicle && vehicle.currentKm && vehicle.currentKm > lastKm) {
+          lastKm = vehicle.currentKm;
+        }
+
+        if (lastKm > 0 && newKmStart > lastKm) {
+          const gapKm = newKmStart - lastKm;
+          await Ride.create({
+            platform: 'Passeio',
+            rides: 0,
+            earnings: 0,
+            kmStart: lastKm,
+            kmEnd: newKmStart,
+            kmTotal: gapKm,
+            status: 'closed',
+            date: startTimeVal,
+            startTime: startTimeVal,
+            endTime: startTimeVal
+          });
         }
       }
 
