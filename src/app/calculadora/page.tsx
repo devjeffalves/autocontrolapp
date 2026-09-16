@@ -42,17 +42,38 @@ export default function CalculadoraPage() {
     targetGrossRevenue: 10833.00,
   });
 
+  const [realAvg, setRealAvg] = useState<number | null>(null);
+
   // Fetch saved config & vehicle info on mount
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [cRes, vRes] = await Promise.all([
+        const [cRes, vRes, rRes] = await Promise.all([
           fetch('/api/cost-config'),
-          fetch('/api/vehicle')
+          fetch('/api/vehicle'),
+          fetch('/api/rides')
         ]);
         
         const cData = await cRes.json();
         const vData = await vRes.json();
+        const rData = await rRes.json();
+
+        if (rData.success && Array.isArray(rData.data)) {
+          const closedRides = rData.data.filter((r: any) => r.status === 'closed');
+          let totalLitres = 0;
+          let totalKm = 0;
+          closedRides.forEach((r: any) => {
+            const rideLitres = r.fuelings?.reduce((acc: number, curr: any) => acc + (curr.litres || 0), 0) || 0;
+            totalLitres += rideLitres;
+            totalKm += (r.kmTotal || 0);
+          });
+          if (totalLitres > 0 && totalKm > 0) {
+            const calculatedAvg = totalKm / totalLitres;
+            if (calculatedAvg >= 6 && calculatedAvg <= 30) {
+              setRealAvg(calculatedAvg);
+            }
+          }
+        }
 
         if (cData.success && cData.data) {
           setConfig((prev) => ({
@@ -563,8 +584,35 @@ export default function CalculadoraPage() {
                   step="0.1"
                   value={config.avgConsumption || ''}
                   onChange={(e) => setConfig(p => ({ ...p, avgConsumption: parseFloat(e.target.value) || 0 }))}
-                  placeholder="12.5"
+                  placeholder="15.0"
                 />
+                {realAvg ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfig(p => ({ ...p, avgConsumption: parseFloat(realAvg.toFixed(1)) }))}
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: '#ea580c',
+                      background: '#fff7ed',
+                      border: '1px solid #ffedd5',
+                      borderRadius: '8px',
+                      padding: '4px 8px',
+                      marginTop: '4px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Sparkles size={12} /> Usar média real ({realAvg.toFixed(1)} km/L)
+                  </button>
+                ) : (
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
+                    Ex: 15.0 a 15.5 km/L (2.600km / R$ 1.050)
+                  </span>
+                )}
               </div>
             </div>
           </div>
