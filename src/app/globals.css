@@ -138,6 +138,7 @@ p { line-height: 1.6; color: var(--text-muted); }
   flex-direction: column;
   gap: 8px;
   width: 100%;
+  min-width: 0;
 }
 
 .input-group label {
@@ -150,6 +151,9 @@ p { line-height: 1.6; color: var(--text-muted); }
 
 .input-group input, 
 .input-group select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   background: #f1f5f9;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
@@ -659,7 +663,30 @@ p { line-height: 1.6; color: var(--text-muted); }
 /* Form Input Enhancements for Calc */
 .calc-input-row {
   display: flex;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
+}
+
+.calc-input-row > * {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .calc-input-row {
+    gap: 8px;
+  }
+  .calc-input-row .input-group label {
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .calc-input-row .input-group input {
+    padding: 12px 8px;
+    font-size: 0.9rem;
+    text-align: center;
+  }
 }
 
 .calc-input-wrapper {
@@ -667,6 +694,7 @@ p { line-height: 1.6; color: var(--text-muted); }
   display: flex;
   align-items: center;
   width: 100%;
+  min-width: 0;
 }
 
 .calc-currency-prefix {
