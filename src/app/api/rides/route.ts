@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     if (body.action === 'standalone_fueling') {
       const fuelCost = Number(body.fuelCost);
       const fuelLitres = Number(body.fuelLitres);
-      const vehicle = await Vehicle.findOne();
+      const vehicle = (await Vehicle.findOne({ isActive: true })) || (await Vehicle.findOne({}));
       const fuelKmNum = body.fuelKm ? Number(body.fuelKm) : (vehicle?.currentKm || 0);
       const fuelingDate = body.date ? parseDateInput(body.date) : new Date();
 
@@ -52,6 +52,8 @@ export async function POST(request: NextRequest) {
         kmStart: fuelKmNum,
         kmEnd: fuelKmNum,
         kmTotal: 0,
+        vehicleId: vehicle?._id?.toString(),
+        vehiclePlate: vehicle?.plate,
         fuelings: [{
           cost: fuelCost,
           litres: fuelLitres,
@@ -64,15 +66,14 @@ export async function POST(request: NextRequest) {
         endTime: fuelingDate
       });
 
-      // Atualizar KM do veículo e desativar reserva se informado
+      // Atualizar KM do veículo ativo e desativar reserva se informado
       const updateData: any = { reserveActive: false, reserveStartKm: 0, lastUpdated: new Date() };
-      if (fuelKmNum > 0) {
-        await Vehicle.findOneAndUpdate(
-          {},
-          { ...updateData, $max: { currentKm: fuelKmNum } }
-        );
-      } else {
-        await Vehicle.findOneAndUpdate({}, updateData);
+      if (vehicle) {
+        if (fuelKmNum > 0) {
+          await Vehicle.findByIdAndUpdate(vehicle._id, { ...updateData, $max: { currentKm: fuelKmNum } });
+        } else {
+          await Vehicle.findByIdAndUpdate(vehicle._id, updateData);
+        }
       }
 
       return NextResponse.json({ success: true, data: ride }, { status: 201 });
@@ -87,23 +88,21 @@ export async function POST(request: NextRequest) {
       
       const newKmStart = Number(body.kmStart);
       const startTimeVal = parseDateInput(body.startTime);
+      const activeVehicle = (await Vehicle.findOne({ isActive: true })) || (await Vehicle.findOne({}));
 
       // Se houver diferença de KM em relação ao último turno fechado e autoLogPersonalGap for true
-      if (body.autoLogPersonalGap !== false) {
-        const [lastClosedRide, vehicle] = await Promise.all([
-          Ride.findOne({
-            status: 'closed',
-            $or: [{ kmEnd: { $exists: true, $ne: null } }, { kmStart: { $exists: true, $ne: null } }]
-          }).sort({ kmEnd: -1, kmStart: -1, date: -1, createdAt: -1 }),
-          Vehicle.findOne({})
-        ]);
+      if (body.autoLogPersonalGap !== false && activeVehicle) {
+        const lastClosedRide = await Ride.findOne({
+          status: 'closed',
+          $or: [{ vehicleId: activeVehicle._id.toString() }, { vehiclePlate: activeVehicle.plate }]
+        }).sort({ kmEnd: -1, kmStart: -1, date: -1, createdAt: -1 });
 
         let lastKm = 0;
         if (lastClosedRide) {
           lastKm = lastClosedRide.kmEnd || lastClosedRide.kmStart || 0;
         }
-        if (vehicle && vehicle.currentKm && vehicle.currentKm > lastKm) {
-          lastKm = vehicle.currentKm;
+        if (activeVehicle.currentKm && activeVehicle.currentKm > lastKm) {
+          lastKm = activeVehicle.currentKm;
         }
 
         if (lastKm > 0 && newKmStart > lastKm) {
@@ -115,6 +114,8 @@ export async function POST(request: NextRequest) {
             kmStart: lastKm,
             kmEnd: newKmStart,
             kmTotal: gapKm,
+            vehicleId: activeVehicle._id.toString(),
+            vehiclePlate: activeVehicle.plate,
             status: 'closed',
             date: startTimeVal,
             startTime: startTimeVal,
@@ -126,17 +127,19 @@ export async function POST(request: NextRequest) {
       const ride = await Ride.create({
         kmStart: newKmStart,
         platform: body.platform || 'Aplicativos',
+        vehicleId: activeVehicle?._id?.toString(),
+        vehiclePlate: activeVehicle?.plate,
         date: startTimeVal,
         startTime: startTimeVal,
         status: 'open'
       });
 
-      // Atualizar KM do veículo com o odômetro inicial do turno
-      if (newKmStart > 0) {
-        await Vehicle.findOneAndUpdate(
-          {},
-          { $max: { currentKm: newKmStart }, lastUpdated: new Date() }
-        );
+      // Atualizar KM do veículo ativo com o odômetro inicial do turno
+      if (activeVehicle && newKmStart > 0) {
+        await Vehicle.findByIdAndUpdate(activeVehicle._id, {
+          $max: { currentKm: newKmStart },
+          lastUpdated: new Date()
+        });
       }
 
       return NextResponse.json({ success: true, data: ride }, { status: 201 });
@@ -178,8 +181,8 @@ export async function POST(request: NextRequest) {
 
     // 5. Adicionar Abastecimento ao turno
     if (body.action === 'add_fueling') {
-      const vehicle = await Vehicle.findOne();
-      const fuelKmNum = body.fuelKm ? Number(body.fuelKm) : (activeSession.kmEnd || activeSession.kmStart || vehicle?.currentKm || 0);
+      const activeVehicle = (await Vehicle.findOne({ isActive: true })) || (await Vehicle.findOne({}));
+      const fuelKmNum = body.fuelKm ? Number(body.fuelKm) : (activeSession.kmEnd || activeSession.kmStart || activeVehicle?.currentKm || 0);
       const fuelingDate = body.date ? parseDateInput(body.date) : new Date();
 
       activeSession.fuelings.push({
@@ -190,15 +193,14 @@ export async function POST(request: NextRequest) {
       });
       await activeSession.save();
 
-      // Atualizar o KM do veículo e desativar reserva
+      // Atualizar o KM do veículo ativo e desativar reserva
       const updateData: any = { reserveActive: false, reserveStartKm: 0, lastUpdated: new Date() };
-      if (fuelKmNum > 0) {
-        await Vehicle.findOneAndUpdate(
-          {},
-          { ...updateData, $max: { currentKm: fuelKmNum } }
-        );
-      } else {
-        await Vehicle.findOneAndUpdate({}, updateData);
+      if (activeVehicle) {
+        if (fuelKmNum > 0) {
+          await Vehicle.findByIdAndUpdate(activeVehicle._id, { ...updateData, $max: { currentKm: fuelKmNum } });
+        } else {
+          await Vehicle.findByIdAndUpdate(activeVehicle._id, updateData);
+        }
       }
 
       return NextResponse.json({ success: true, data: activeSession });
@@ -211,12 +213,10 @@ export async function POST(request: NextRequest) {
       let endTimeVal = (body.endTime && String(body.endTime).trim()) ? parseDateInput(body.endTime) : new Date();
       
       const sessionStart = activeSession.startTime ? new Date(activeSession.startTime) : (activeSession.date ? new Date(activeSession.date) : new Date());
-      // Se o endTime for menor ou igual ao startTime da sessão, assume o momento atual
       if (isNaN(endTimeVal.getTime()) || endTimeVal.getTime() <= sessionStart.getTime()) {
         endTimeVal = new Date();
       }
       
-      // Fechar e validar pausas para que nenhuma pausa ultrapasse o endTime do turno
       if (activeSession.pauses && activeSession.pauses.length > 0) {
         activeSession.pauses.forEach((p: any) => {
           if (!p.endTime || new Date(p.endTime).getTime() > endTimeVal.getTime()) {
@@ -239,8 +239,12 @@ export async function POST(request: NextRequest) {
       
       await activeSession.save();
 
-      // Atualizar o KM atual do veículo
-      await Vehicle.findOneAndUpdate({}, { currentKm: kmEnd, lastUpdated: new Date() });
+      // Atualizar o KM atual do veículo ativo correspondente
+      if (activeSession.vehicleId) {
+        await Vehicle.findByIdAndUpdate(activeSession.vehicleId, { currentKm: kmEnd, lastUpdated: new Date() });
+      } else {
+        await Vehicle.findOneAndUpdate({ isActive: true }, { currentKm: kmEnd, lastUpdated: new Date() });
+      }
       
       return NextResponse.json({ success: true, data: activeSession });
     }

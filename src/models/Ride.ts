@@ -22,6 +22,8 @@ export interface IRide extends Document {
   pauses?: IPause[];
   earnings: number;
   status: 'open' | 'paused' | 'closed';
+  vehicleId?: string;
+  vehiclePlate?: string;
   startTime?: Date;
   endTime?: Date;
   date: Date;
@@ -34,6 +36,8 @@ const RideSchema: Schema = new Schema({
   kmStart: { type: Number, required: true },
   kmEnd: { type: Number },
   kmTotal: { type: Number },
+  vehicleId: { type: String },
+  vehiclePlate: { type: String },
   fuelings: [{
     cost: { type: Number, required: true },
     litres: { type: Number, required: true },
