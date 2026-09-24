@@ -36,7 +36,59 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
     const body = await request.json();
-    
+
+    // 0. Registrar Turno Retroativo / Concluído (Pós-Jornada)
+    if (body.action === 'create_past_shift') {
+      const activeVehicle = (await Vehicle.findOne({ isActive: true })) || (await Vehicle.findOne({}));
+      const kmStart = Number(body.kmStart);
+      const kmEnd = Number(body.kmEnd);
+
+      if (isNaN(kmStart) || isNaN(kmEnd) || kmEnd <= kmStart) {
+        return NextResponse.json({ success: false, error: 'O KM Final deve ser maior que o KM Inicial' }, { status: 400 });
+      }
+
+      const kmTotal = kmEnd - kmStart;
+      const startTimeVal = parseDateInput(body.startTime);
+      const endTimeVal = parseDateInput(body.endTime);
+
+      const fuelings = [];
+      if (Number(body.fuelCost) > 0 && Number(body.fuelLitres) > 0) {
+        const fKm = body.fuelKm ? Number(body.fuelKm) : (kmEnd || kmStart || 0);
+        fuelings.push({
+          cost: Number(body.fuelCost),
+          litres: Number(body.fuelLitres),
+          date: endTimeVal || startTimeVal,
+          km: fKm > 0 ? fKm : undefined
+        });
+      }
+
+      const ride = await Ride.create({
+        platform: body.platform || 'Aplicativos',
+        rides: Number(body.rides) || 0,
+        earnings: Number(body.earnings) || 0,
+        kmStart,
+        kmEnd,
+        kmTotal,
+        fuelings,
+        status: 'closed',
+        vehicleId: activeVehicle?._id?.toString(),
+        vehiclePlate: activeVehicle?.plate,
+        date: startTimeVal,
+        startTime: startTimeVal,
+        endTime: endTimeVal
+      });
+
+      // Atualizar KM do veículo ativo se o KM final for maior que o KM atual do veículo
+      if (activeVehicle && kmEnd > (activeVehicle.currentKm || 0)) {
+        await Vehicle.findByIdAndUpdate(activeVehicle._id, {
+          $max: { currentKm: kmEnd },
+          lastUpdated: new Date()
+        });
+      }
+
+      return NextResponse.json({ success: true, data: ride }, { status: 201 });
+    }
+
     // 1. Abastecimento Avulso (sem necessidade de turno aberto)
     if (body.action === 'standalone_fueling') {
       const fuelCost = Number(body.fuelCost);

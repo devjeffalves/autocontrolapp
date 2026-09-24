@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus, Mic, MicOff, Pause, Coffee } from 'lucide-react';
+import { Save, ChevronLeft, DollarSign, Navigation, Droplets, Hash, AlertCircle, CheckCircle, Loader2, Play, Check, Plus, Mic, MicOff, Pause, Coffee, Calendar, Clock, Fuel } from 'lucide-react';
 import Link from 'next/link';
 import { dateToLocalInputValue, formatTimePtBR, formatDatePtBR, calculateWorkingMinutes } from '@/lib/dateUtils';
 
@@ -15,6 +15,22 @@ export default function NovoRegistro() {
   const [autoLogPersonalGap, setAutoLogPersonalGap] = useState(true);
 
   const getLocalDateTimeString = (date?: Date) => dateToLocalInputValue(date || new Date());
+
+  // Modo de registro: 'realtime' (tempo real) ou 'retroactive' (lançamento retroativo pós-jornada)
+  const [shiftMode, setShiftMode] = useState<'realtime' | 'retroactive'>('realtime');
+  const [retroactiveData, setRetroactiveData] = useState({
+    startTime: getLocalDateTimeString(new Date(Date.now() - 8 * 3600 * 1000)),
+    endTime: getLocalDateTimeString(),
+    kmStart: '',
+    kmEnd: '',
+    rides: '',
+    earnings: '',
+    platform: 'Aplicativos',
+    hasFueling: false,
+    fuelCost: '',
+    fuelLitres: '',
+    fuelKm: ''
+  });
 
   // Form states for different actions
   const [startData, setStartData] = useState(() => ({ kmStart: '', platform: 'Aplicativos', startTime: getLocalDateTimeString() }));
@@ -369,6 +385,51 @@ export default function NovoRegistro() {
     }
   };
 
+  const handleCreatePastShift = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const kmStartNum = Number(retroactiveData.kmStart);
+    const kmEndNum = Number(retroactiveData.kmEnd);
+
+    if (isNaN(kmStartNum) || isNaN(kmEndNum) || kmEndNum <= kmStartNum) {
+      setNotification({ type: 'error', message: 'O KM Final deve ser maior que o KM Inicial' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/rides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...retroactiveData, action: 'create_past_shift' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setNotification({ type: 'success', message: 'Turno pós-jornada registrado com sucesso!' });
+        setRetroactiveData({
+          startTime: getLocalDateTimeString(new Date(Date.now() - 8 * 3600 * 1000)),
+          endTime: getLocalDateTimeString(),
+          kmStart: '',
+          kmEnd: '',
+          rides: '',
+          earnings: '',
+          platform: 'Aplicativos',
+          hasFueling: false,
+          fuelCost: '',
+          fuelLitres: '',
+          fuelKm: ''
+        });
+        fetchActiveSession();
+        window.dispatchEvent(new CustomEvent('shift-state-changed'));
+      } else {
+        setNotification({ type: 'error', message: json.error });
+      }
+    } catch (err) {
+      setNotification({ type: 'error', message: 'Erro na conexão.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container" style={{ justifyContent: 'center', alignItems: 'center' }}>
@@ -416,6 +477,60 @@ export default function NovoRegistro() {
       <div className="form-container">
         {!activeSession ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Seletor de Modo de Lançamento */}
+            <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '4px', gap: '4px' }}>
+              <button 
+                type="button"
+                className={`tab-mode-btn ${shiftMode === 'realtime' ? 'active' : ''}`}
+                onClick={() => setShiftMode('realtime')}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontWeight: '700',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  background: shiftMode === 'realtime' ? 'white' : 'transparent',
+                  color: shiftMode === 'realtime' ? 'var(--primary)' : '#64748b',
+                  boxShadow: shiftMode === 'realtime' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Play size={16} /> Tempo Real
+              </button>
+              <button 
+                type="button"
+                className={`tab-mode-btn ${shiftMode === 'retroactive' ? 'active' : ''}`}
+                onClick={() => setShiftMode('retroactive')}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontWeight: '700',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  background: shiftMode === 'retroactive' ? 'white' : 'transparent',
+                  color: shiftMode === 'retroactive' ? 'var(--primary)' : '#64748b',
+                  boxShadow: shiftMode === 'retroactive' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Calendar size={16} /> Lançar Pós-Jornada
+              </button>
+            </div>
+
+            {shiftMode === 'realtime' ? (
+              <>
             <motion.form 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -549,6 +664,185 @@ export default function NovoRegistro() {
                 <Plus size={18} /> Salvar Abastecimento Avulso
               </button>
             </motion.form>
+            </>
+            ) : (
+              <motion.form 
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                onSubmit={handleCreatePastShift} 
+                className="card animate-in"
+              >
+                <div className="status-badge start" style={{ background: '#fef3c7', color: '#b45309' }}>Turno Concluído (Pós-Jornada)</div>
+                <p className="description">Lance os dados de um turno que você já concluiu anteriormente.</p>
+
+                <div className="input-row">
+                  <div className="input-group">
+                    <label><Clock size={14} /> Data/Hora Início</label>
+                    <input 
+                      type="datetime-local" 
+                      value={retroactiveData.startTime}
+                      onChange={e => setRetroactiveData({...retroactiveData, startTime: e.target.value})}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label><Clock size={14} /> Data/Hora Fim</label>
+                    <input 
+                      type="datetime-local" 
+                      value={retroactiveData.endTime}
+                      onChange={e => setRetroactiveData({...retroactiveData, endTime: e.target.value})}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+
+                <div className="input-row">
+                  <div className="input-group">
+                    <label><Navigation size={14} /> KM Inicial</label>
+                    <input 
+                      type="number" 
+                      placeholder="Ex: 45000"
+                      value={retroactiveData.kmStart}
+                      onChange={e => setRetroactiveData({...retroactiveData, kmStart: e.target.value})}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label><Navigation size={14} /> KM Final</label>
+                    <input 
+                      type="number" 
+                      placeholder="Ex: 45220"
+                      value={retroactiveData.kmEnd}
+                      onChange={e => setRetroactiveData({...retroactiveData, kmEnd: e.target.value})}
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+
+                {retroactiveData.kmStart && retroactiveData.kmEnd && (
+                  <div className="shift-preview glass" style={{ marginBottom: '16px' }}>
+                    <div className="preview-item">
+                      <span>Distância Total do Turno:</span>
+                      <strong>
+                        {Number(retroactiveData.kmEnd) > Number(retroactiveData.kmStart)
+                          ? `${Number(retroactiveData.kmEnd) - Number(retroactiveData.kmStart)} km`
+                          : 'KM Final deve ser maior que Inicial'}
+                      </strong>
+                    </div>
+                  </div>
+                )}
+
+                <div className="input-group">
+                  <label>Tipo de Atividade</label>
+                  <div className="platform-toggle">
+                    <button 
+                      type="button" 
+                      className={`toggle-btn ${retroactiveData.platform !== 'Passeio' ? 'active aplicativos' : ''}`}
+                      onClick={() => setRetroactiveData({...retroactiveData, platform: 'Aplicativos'})}
+                    >Trabalho</button>
+                    <button 
+                      type="button" 
+                      className={`toggle-btn ${retroactiveData.platform === 'Passeio' ? 'active tour' : ''}`}
+                      onClick={() => setRetroactiveData({...retroactiveData, platform: 'Passeio'})}
+                    >Passeio</button>
+                  </div>
+                </div>
+
+                {retroactiveData.platform !== 'Passeio' && (
+                  <div className="input-row" style={{ marginTop: '12px' }}>
+                    <div className="input-group">
+                      <label><Hash size={14} /> Quantidade de Corridas</label>
+                      <input 
+                        type="number" 
+                        placeholder="Ex: 18"
+                        value={retroactiveData.rides}
+                        onChange={e => setRetroactiveData({...retroactiveData, rides: e.target.value})}
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label><DollarSign size={14} /> Ganhos Totais (R$)</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="Ex: 285.50"
+                        value={retroactiveData.earnings}
+                        onChange={e => setRetroactiveData({...retroactiveData, earnings: e.target.value})}
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Bloco de Abastecimento Opcional */}
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={retroactiveData.hasFueling} 
+                      onChange={e => setRetroactiveData({...retroactiveData, hasFueling: e.target.checked})}
+                    />
+                    <Droplets size={16} color="var(--primary)" /> Houve abastecimento neste turno?
+                  </label>
+
+                  {retroactiveData.hasFueling && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}
+                    >
+                      <div className="input-row">
+                        <div className="input-group">
+                          <label>Valor (R$)</label>
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0,00"
+                            value={retroactiveData.fuelCost}
+                            onChange={e => setRetroactiveData({...retroactiveData, fuelCost: e.target.value})}
+                            required={retroactiveData.hasFueling}
+                            disabled={submitting}
+                          />
+                        </div>
+                        <div className="input-group">
+                          <label>Litros</label>
+                          <input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00"
+                            value={retroactiveData.fuelLitres}
+                            onChange={e => setRetroactiveData({...retroactiveData, fuelLitres: e.target.value})}
+                            required={retroactiveData.hasFueling}
+                            disabled={submitting}
+                          />
+                        </div>
+                        <div className="input-group">
+                          <label>KM no Posto (Opcional)</label>
+                          <input 
+                            type="number" 
+                            placeholder="Ex: 45150"
+                            value={retroactiveData.fuelKm}
+                            onChange={e => setRetroactiveData({...retroactiveData, fuelKm: e.target.value})}
+                            disabled={submitting}
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+
+                <button type="submit" className="btn-primary" style={{ marginTop: '20px' }} disabled={submitting}>
+                  {submitting ? <Loader2 className="animate-spin" /> : <Save size={18} />}
+                  Salvar Turno Concluído
+                </button>
+              </motion.form>
+            )}
           </div>
         ) : (
           <div className="active-session-flow">
