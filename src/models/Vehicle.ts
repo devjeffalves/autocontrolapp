@@ -23,6 +23,7 @@ export interface IVehicle extends Omit<Document, 'model'> {
   reserveLitres?: number;
   reserveStartKm?: number;
   reserveActive?: boolean;
+  isActive?: boolean;
   lastUpdated: Date;
   reminders: IReminder[];
   oilChecks: IOilCheck[];
@@ -37,6 +38,7 @@ const VehicleSchema: Schema = new Schema({
   reserveLitres: { type: Number, default: 5 },
   reserveStartKm: { type: Number, default: 0 },
   reserveActive: { type: Boolean, default: false },
+  isActive: { type: Boolean, default: false },
   lastUpdated: { type: Date, default: Date.now },
   reminders: [{
     title: { type: String, required: true },

@@ -18,6 +18,7 @@ import {
   Info
 } from 'lucide-react';
 import Link from 'next/link';
+import RideEvaluatorCard from '@/components/RideEvaluatorCard';
 
 export default function CalculadoraPage() {
   const [activeTab, setActiveTab] = useState<'details' | 'settings'>('details');
@@ -394,20 +395,8 @@ export default function CalculadoraPage() {
             />
           </div>
 
-          {/* Call to Action Button: "Aplicar $/Km e $/Hr no Semáforo" */}
-          <button
-            onClick={handleSaveConfig}
-            disabled={isSaving}
-            className="calc-cta-btn"
-          >
-            {isSaving ? (
-              <Sparkles size={20} className="animate-spin" />
-            ) : (
-              <>
-                Aplicar $/Km e $/Hr no Semáforo
-              </>
-            )}
-          </button>
+          {/* Semáforo de Avaliação de Corridas Integrado */}
+          <RideEvaluatorCard isEmbedded={true} />
 
           {/* Breakdown of Costs */}
           <div className="card" style={{ padding: '18px' }}>

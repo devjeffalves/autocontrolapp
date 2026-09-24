@@ -2,14 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock, Calculator } from 'lucide-react';
+import { Wallet, Navigation, Fuel, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2, Pencil, Trash2, X, Save, Sparkles, Send, Bot, MessageSquare, Mic, MicOff, Volume2, Square, Clock, Calculator, Zap } from 'lucide-react';
 import Link from 'next/link';
 import FuelReserveCard from '@/components/FuelReserveCard';
+import RideEvaluatorCard from '@/components/RideEvaluatorCard';
 import { dateToLocalInputValue, formatTimePtBR, calculateWorkingMinutes, formatDuration, getBrasiliaISOWeek, getBrasiliaISOMonth } from '@/lib/dateUtils';
 
 export default function Dashboard() {
   const [selectedWeek, setSelectedWeek] = useState(getBrasiliaISOWeek);
   const [selectedMonth, setSelectedMonth] = useState(getBrasiliaISOMonth);
+  const [showEvalModal, setShowEvalModal] = useState(false);
 
   const getDatesFromWeekString = (weekStr: string) => {
     if (!weekStr || !weekStr.includes('-W')) return null;
@@ -664,6 +666,15 @@ export default function Dashboard() {
         ))}
       </section>
 
+      {/* Seção Semáforo de Ofertas / Avaliar Corrida */}
+      <motion.section 
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="my-4"
+      >
+        <RideEvaluatorCard isEmbedded={true} />
+      </motion.section>
+
       {/* Banner Calculadora de Custos & Lucro */}
       <motion.section 
         initial={{ opacity: 0, y: 15 }}
@@ -692,6 +703,11 @@ export default function Dashboard() {
           </Link>
         </div>
       </motion.section>
+
+      {/* Modal de Avaliação de Corrida caso acionado externamente */}
+      {showEvalModal && (
+        <RideEvaluatorCard isOpen={true} onClose={() => setShowEvalModal(false)} />
+      )}
 
       <section className="chart-section card">
         <div className="section-header" style={{ marginBottom: '8px' }}>

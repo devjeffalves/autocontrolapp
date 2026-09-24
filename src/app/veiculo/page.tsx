@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Car, Settings, Fuel, Activity, PenLine, Save, X, Plus, Trash2, Camera, Calendar, ChevronRight, Calculator } from 'lucide-react';
+import { Car, Settings, Fuel, Activity, PenLine, Save, X, Plus, Trash2, Camera, Calendar, ChevronRight, Calculator, CheckCircle2, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import FuelReserveCard from '@/components/FuelReserveCard';
 
@@ -17,6 +17,18 @@ export default function Veiculo() {
     reminders: [],
     oilChecks: [],
   });
+
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newVehicle, setNewVehicle] = useState({
+    model: '',
+    plate: '',
+    fuelType: 'Flex',
+    avgConsumption: 12.5,
+    currentKm: 0,
+    isActive: false
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [newReminder, setNewReminder] = useState({ title: '', dueInfo: '', status: 'ok' });
@@ -34,6 +46,7 @@ export default function Veiculo() {
       const rData = await rRes.json();
 
       if (vData.data) setVehicle(vData.data);
+      if (vData.vehicles) setVehicles(vData.vehicles);
       
       if (rData.success) {
         const allRides = rData.data;
@@ -157,6 +170,78 @@ export default function Veiculo() {
     return () => clearTimeout(timer);
   }, [vehicle]);
 
+  const handleSelectWorkVehicle = async (vehicleId: string) => {
+    try {
+      const res = await fetch('/api/vehicle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'select', vehicleId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.data) setVehicle(data.data);
+        if (data.vehicles) setVehicles(data.vehicles);
+        window.dispatchEvent(new CustomEvent('shift-state-changed'));
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Erro ao selecionar veículo de trabalho:', err);
+    }
+  };
+
+  const handleAddNewVehicle = async () => {
+    if (!newVehicle.model || !newVehicle.plate) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/vehicle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newVehicle),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.data) setVehicle(data.data);
+        if (data.vehicles) setVehicles(data.vehicles);
+        setShowAddModal(false);
+        setNewVehicle({
+          model: '',
+          plate: '',
+          fuelType: 'Flex',
+          avgConsumption: 12.5,
+          currentKm: 0,
+          isActive: false
+        });
+        window.dispatchEvent(new CustomEvent('shift-state-changed'));
+        fetchData();
+      } else {
+        alert('Erro ao cadastrar veículo: ' + data.error);
+      }
+    } catch (err) {
+      alert('Erro de conexão ao cadastrar veículo');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteVehicle = async (vehicleId: string) => {
+    if (!confirm('Deseja realmente excluir este veículo?')) return;
+    try {
+      const res = await fetch('/api/vehicle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', vehicleId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.data) setVehicle(data.data);
+        if (data.vehicles) setVehicles(data.vehicles);
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Erro ao deletar veículo:', err);
+    }
+  };
+
   const handleSave = async (updatedVehicle = vehicle, shouldClose = true) => {
     try {
       const res = await fetch('/api/vehicle', {
@@ -166,7 +251,8 @@ export default function Veiculo() {
       });
       const data = await res.json();
       if (data.success) {
-        setVehicle(data.data);
+        if (data.data) setVehicle(data.data);
+        if (data.vehicles) setVehicles(data.vehicles);
       }
     } catch (error) {
       console.error('Erro ao salvar:', error);
@@ -217,14 +303,164 @@ export default function Veiculo() {
   return (
     <div className="veiculo-page">
       <header className="header">
-        <h1 className="title">Meu Veículo</h1>
+        <h1 className="title">Veículo de Trabalho</h1>
         <button 
           className={`settings-btn glass ${isEditing ? 'active' : ''}`}
           onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+          title="Editar Dados do Veículo Ativo"
         >
           {isEditing ? <Save size={20} /> : <Settings size={20} />}
         </button>
       </header>
+
+      {/* Lista e Seleção de Veículos */}
+      <section className="card" style={{ padding: '18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Meus Veículos</h3>
+            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '2px 0 0 0' }}>Selecione qual veículo você está utilizando para rodar no aplicativo</p>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+            }}
+          >
+            <Plus size={16} /> Adicionar Veículo
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {vehicles.length === 0 ? (
+            <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '6px 0' }}>Nenhum veículo cadastrado.</p>
+          ) : (
+            vehicles.map((v: any) => {
+              const isActive = v._id === vehicle._id || v.isActive;
+              return (
+                <div
+                  key={v._id || v.plate}
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: '14px',
+                    border: isActive ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                    background: isActive ? '#eff6ff' : '#ffffff',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: isActive ? '0 4px 14px rgba(37, 99, 235, 0.08)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '12px',
+                      background: isActive ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : '#f1f5f9',
+                      color: isActive ? '#ffffff' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <Car size={20} />
+                    </div>
+
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{v.model}</h4>
+                        {isActive ? (
+                          <span style={{
+                            fontSize: '0.66rem',
+                            fontWeight: 800,
+                            background: '#10b981',
+                            color: '#ffffff',
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <CheckCircle2 size={11} /> ATIVO DE TRABALHO
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: '0.66rem',
+                            fontWeight: 600,
+                            background: '#f1f5f9',
+                            color: '#64748b',
+                            padding: '2px 8px',
+                            borderRadius: '10px'
+                          }}>
+                            Secundário
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <span>Placa: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{v.plate}</strong></span>
+                        <span>• {v.fuelType}</span>
+                        <span>• {(v.currentKm || 0).toLocaleString('pt-BR')} km</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    {!isActive && (
+                      <button
+                        onClick={() => handleSelectWorkVehicle(v._id)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          background: '#ffffff',
+                          border: '1px solid #2563eb',
+                          color: '#2563eb',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Selecionar p/ Trabalho
+                      </button>
+                    )}
+
+                    {vehicles.length > 1 && (
+                      <button
+                        onClick={() => handleDeleteVehicle(v._id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          padding: '6px'
+                        }}
+                        title="Excluir veículo"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
       <section className="vehicle-card card">
         {isEditing ? (
           <div className="edit-form">
@@ -517,6 +753,106 @@ export default function Veiculo() {
                 </div>
                 <button className="btn-primary" onClick={addReminder}>Adicionar</button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Adicionar Novo Veículo */}
+      <AnimatePresence>
+        {showAddModal && (
+          <div className="modal-overlay">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="modal-content card"
+              style={{ maxWidth: '450px' }}
+            >
+              <div className="modal-header">
+                <h3>Adicionar Novo Veículo</h3>
+                <button onClick={() => setShowAddModal(false)}><X size={20} /></button>
+              </div>
+              
+              <form onSubmit={(e) => { e.preventDefault(); handleAddNewVehicle(); }} className="edit-form">
+                <div className="input-group">
+                  <label>Modelo do Veículo</label>
+                  <input 
+                    placeholder="Ex: Fiat Cronos 1.3" 
+                    value={newVehicle.model}
+                    onChange={e => setNewVehicle({...newVehicle, model: e.target.value})}
+                    required
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label>Placa</label>
+                  <input 
+                    placeholder="Ex: ABC-1D23" 
+                    value={newVehicle.plate}
+                    onChange={e => setNewVehicle({...newVehicle, plate: e.target.value})}
+                    required
+                  />
+                </div>
+
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>Combustível</label>
+                    <select 
+                      value={newVehicle.fuelType}
+                      onChange={e => setNewVehicle({...newVehicle, fuelType: e.target.value})}
+                    >
+                      <option value="Flex">Flex</option>
+                      <option value="Gasolina">Gasolina</option>
+                      <option value="Etanol">Etanol</option>
+                      <option value="GNV">GNV</option>
+                      <option value="Diesel">Diesel</option>
+                      <option value="Elétrico">Elétrico</option>
+                    </select>
+                  </div>
+
+                  <div className="input-group">
+                    <label>Consumo (km/L)</label>
+                    <input 
+                      type="number"
+                      step="0.1"
+                      placeholder="12.5" 
+                      value={newVehicle.avgConsumption || ''}
+                      onChange={e => setNewVehicle({...newVehicle, avgConsumption: parseFloat(e.target.value) || 0})}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>KM Atual do Odômetro</label>
+                  <input 
+                    type="number"
+                    placeholder="45000" 
+                    value={newVehicle.currentKm || ''}
+                    onChange={e => setNewVehicle({...newVehicle, currentKm: parseInt(e.target.value, 10) || 0})}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="isActiveCheck"
+                    checked={newVehicle.isActive}
+                    onChange={e => setNewVehicle({...newVehicle, isActive: e.target.checked})}
+                    style={{ width: '18px', height: '18px', accentColor: '#2563eb' }}
+                  />
+                  <label htmlFor="isActiveCheck" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>
+                    Definir como Veículo de Trabalho Ativo
+                  </label>
+                </div>
+
+                <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ marginTop: '10px' }}>
+                  {isSubmitting ? <Sparkles className="animate-spin" size={18} /> : <Plus size={18} />}
+                  Cadastrar Veículo
+                </button>
+              </form>
             </motion.div>
           </div>
         )}

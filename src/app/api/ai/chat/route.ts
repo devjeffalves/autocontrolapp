@@ -4,6 +4,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import dbConnect from '@/lib/mongodb';
 import Ride from '@/models/Ride';
 import Vehicle from '@/models/Vehicle';
+import CostConfig from '@/models/CostConfig';
+import { evaluateRideOffer } from '@/lib/rideEvaluator';
 import { calculateWorkingMinutes, formatDuration } from '@/lib/dateUtils';
 
 export async function POST(request: NextRequest) {
@@ -22,10 +24,11 @@ export async function POST(request: NextRequest) {
 
     await dbConnect();
     
-    // Buscar todos os registros fechados para contexto completo sem limitar apenas aos 10 últimos
-    const [rides, vehicle] = await Promise.all([
+    // Buscar registros fechados, veículo e configurações de custo
+    const [rides, vehicle, costConfig] = await Promise.all([
       Ride.find({ status: 'closed' }).sort({ date: -1 }),
-      Vehicle.findOne({})
+      Vehicle.findOne({}),
+      CostConfig.findOne({})
     ]);
 
     let globalCost = 0;
@@ -233,6 +236,48 @@ export async function POST(request: NextRequest) {
       p: r.plataforma
     }));
 
+    // Verificar se o usuário está pedindo para avaliar uma corrida de oferta
+    let rideEvaluationContext = '';
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('avaliar') || lowerMessage.includes('semáforo') || lowerMessage.includes('vale a pena') || lowerMessage.includes('corrida') || lowerMessage.includes('km')) {
+      const priceMatch = lowerMessage.match(/(?:r\$\s*|reais\s*)?(\d+(?:\.\d{1,2})?)/);
+      const kmMatch = lowerMessage.match(/(\d+(?:\.\d{1,2})?)\s*km/);
+      const minMatch = lowerMessage.match(/(\d+)\s*(?:min|minutos)/);
+
+      if (priceMatch && kmMatch) {
+        const pVal = parseFloat(priceMatch[1]);
+        const kVal = parseFloat(kmMatch[1]);
+        const mVal = minMatch ? parseInt(minMatch[1], 10) : 15;
+
+        const activeConfig = costConfig || {
+          rentalCompany: 'Outra',
+          rentalCost: 0,
+          rentalPeriod: 'Mês',
+          otherMonthlyCosts: 0,
+          fuelType: 'Gasolina',
+          fuelPrice: avgFuelPrice,
+          avgConsumption: vehicleAvgConsumption,
+          workingDaysPerMonth: 24,
+          workingHoursPerDay: 10,
+          dailyKmTarget: 180,
+          targetGrossRevenue: 8000,
+        };
+
+        const evalResult = evaluateRideOffer({ price: pVal, distanceKm: kVal, timeMinutes: mVal }, activeConfig);
+        rideEvaluationContext = `
+        AVALIAÇÃO DE OFERTA DE CORRIDA SOLICITADA:
+        - Oferta recebida: R$ ${evalResult.price} por ${evalResult.distanceKm} km (${evalResult.timeMinutes} min).
+        - Classificação: ${evalResult.badge} (${evalResult.status.toUpperCase()})
+        - Ganho por KM: R$ ${evalResult.ratePerKm.toFixed(2)}/km (Meta: R$ ${evalResult.targetRatePerKm.toFixed(2)}/km)
+        - Ganho por Hora: R$ ${evalResult.ratePerHour.toFixed(0)}/h (Meta: R$ ${evalResult.targetRatePerHour.toFixed(0)}/h)
+        - Lucro Líquido: R$ ${evalResult.netProfit.toFixed(2)} (Combustível: R$ ${evalResult.fuelCost.toFixed(2)})
+        - Resumo: ${evalResult.summary}
+        - Motivos: ${evalResult.reasons.join(' | ')}
+        Use estes dados para dar um veredito direto ao motorista com o badge (${evalResult.badge}).
+        `;
+      }
+    }
+
     const systemPrompt = `
       Você é a "Assistente de Bordo" da Auto Control, parceira inteligente de motoristas de aplicativo. Responda em Português do Brasil.
       
@@ -252,14 +297,17 @@ export async function POST(request: NextRequest) {
       ÚLTIMAS CORRIDAS (dur = duração do turno):
       ${JSON.stringify(compactRides)}
 
+      ${rideEvaluationContext}
+
       SUAS CAPACIDADES E INSTRUÇÕES PRINCIPAIS:
       1. VOCÊ POSSUI ACESSO COMPLETO AO TEMPO TRABALHADO E HORAS DOS TURNOS DO MOTORISTA.
          - Nas 'ÚLTIMAS CORRIDAS', a propriedade 'dur' indica a duração exata do turno (ex: "4h 58m").
          - No 'RESUMO MENSAL' e 'RENTABILIDADE POR DIA', a propriedade 'horas_trabalhadas_formatado' informa o total acumulado de horas.
          - NUNCA diga que não possui registro de horas ou tempo trabalhado.
-      2. Indicar os melhores dias/horários com base na RENTABILIDADE POR DIA (maior ganho por hora em R$/h).
-      3. Dar dicas práticas de economia de combustível (velocidade constante 60-80 km/h, pneus calibrados, reduzir marcha lenta e rotas sem passageiro).
-      4. Informar faturamento, lucro e horas exatas quando perguntado sobre qualquer período.
+      2. Avaliar ofertas de corrida com o Semáforo quando solicitado (diga se é BOA 🟢, MEDIANA 🟡 ou RUIM 🔴 e dê os valores por km e hora).
+      3. Indicar os melhores dias/horários com base na RENTABILIDADE POR DIA (maior ganho por hora em R$/h).
+      4. Dar dicas práticas de economia de combustível.
+      5. Informar faturamento, lucro e horas exatas quando perguntado sobre qualquer período.
     `;
 
     let text = "";
