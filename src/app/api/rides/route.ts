@@ -147,17 +147,17 @@ export async function POST(request: NextRequest) {
         const lastClosedRide = await Ride.findOne({
           status: 'closed',
           $or: [{ vehicleId: activeVehicle._id.toString() }, { vehiclePlate: activeVehicle.plate }]
-        }).sort({ kmEnd: -1, kmStart: -1, date: -1, createdAt: -1 });
+        }).sort({ date: -1, createdAt: -1 });
 
         let lastKm = 0;
         if (lastClosedRide) {
           lastKm = lastClosedRide.kmEnd || lastClosedRide.kmStart || 0;
-        }
-        if (activeVehicle.currentKm && activeVehicle.currentKm > lastKm) {
+        } else if (activeVehicle.currentKm) {
           lastKm = activeVehicle.currentKm;
         }
 
-        if (lastKm > 0 && newKmStart > lastKm) {
+        // Criar gap apenas se coerente (diferença positiva e não absurda)
+        if (lastKm > 0 && newKmStart > lastKm && (newKmStart - lastKm) < 3000) {
           const gapKm = newKmStart - lastKm;
           await Ride.create({
             platform: 'Passeio',

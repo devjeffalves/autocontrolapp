@@ -60,7 +60,17 @@ export default function CalculadoraPage() {
         const rData = await rRes.json();
 
         if (rData.success && Array.isArray(rData.data)) {
-          const closedRides = rData.data.filter((r: any) => r.status === 'closed');
+          const activeVehId = vData.data?._id;
+          const activeVehPlate = vData.data?.plate;
+
+          const vehicleRides = rData.data.filter((r: any) => {
+            if (!activeVehId && !activeVehPlate) return true;
+            return (r.vehicleId && r.vehicleId === activeVehId) ||
+                   (r.vehiclePlate && r.vehiclePlate === activeVehPlate);
+          });
+
+          const targetRides = vehicleRides.length > 0 ? vehicleRides : rData.data;
+          const closedRides = targetRides.filter((r: any) => r.status === 'closed');
           let totalLitres = 0;
           let totalKm = 0;
           closedRides.forEach((r: any) => {

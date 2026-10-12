@@ -43,15 +43,31 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Registro não encontrado' }, { status: 404 });
     }
 
-    // Sincronizar/Recalcular KM do veículo com base em todas as corridas do banco de dados
-    const maxKmEndRide = await Ride.findOne({ kmEnd: { $exists: true, $ne: null } }).sort({ kmEnd: -1 });
-    const maxKmStartRide = await Ride.findOne({ kmStart: { $exists: true, $ne: null } }).sort({ kmStart: -1 });
-    const systemMaxKm = Math.max(
-      maxKmEndRide ? (maxKmEndRide.kmEnd || 0) : 0,
-      maxKmStartRide ? (maxKmStartRide.kmStart || 0) : 0
-    );
-    if (systemMaxKm > 0) {
-      await Vehicle.findOneAndUpdate({}, { currentKm: systemMaxKm, lastUpdated: new Date() });
+    // Sincronizar/Recalcular KM do veículo com base na última corrida deste veículo específico
+    const targetVehicle = (updatedRide?.vehicleId ? await Vehicle.findById(updatedRide.vehicleId) : null)
+      || (await Vehicle.findOne({ isActive: true }))
+      || (await Vehicle.findOne({}));
+
+    if (targetVehicle) {
+      const vehicleFilter = {
+        $or: [
+          { vehicleId: targetVehicle._id.toString() },
+          { vehiclePlate: targetVehicle.plate }
+        ]
+      };
+      const latestClosedRide = await Ride.findOne({
+        status: 'closed',
+        ...vehicleFilter
+      }).sort({ date: -1, createdAt: -1 });
+
+      if (latestClosedRide) {
+        const latestKm = latestClosedRide.kmEnd || latestClosedRide.kmStart || 0;
+        if (latestKm > 0) {
+          targetVehicle.currentKm = latestKm;
+          targetVehicle.lastUpdated = new Date();
+          await targetVehicle.save();
+        }
+      }
     }
 
     return NextResponse.json({ success: true, data: updatedRide });
@@ -74,14 +90,28 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: 'Registro não encontrado' }, { status: 404 });
     }
 
-    // Recalcular e atualizar o KM atual do veículo com base nas corridas restantes
-    const maxKmEndRide = await Ride.findOne({ kmEnd: { $exists: true, $ne: null } }).sort({ kmEnd: -1 });
-    const maxKmStartRide = await Ride.findOne({ kmStart: { $exists: true, $ne: null } }).sort({ kmStart: -1 });
-    const systemMaxKm = Math.max(
-      maxKmEndRide ? (maxKmEndRide.kmEnd || 0) : 0,
-      maxKmStartRide ? (maxKmStartRide.kmStart || 0) : 0
-    );
-    await Vehicle.findOneAndUpdate({}, { currentKm: systemMaxKm > 0 ? systemMaxKm : 0, lastUpdated: new Date() });
+    // Recalcular e atualizar o KM atual do veículo com base na última corrida restante deste veículo
+    const targetVehicle = (deletedRide?.vehicleId ? await Vehicle.findById(deletedRide.vehicleId) : null)
+      || (await Vehicle.findOne({ isActive: true }))
+      || (await Vehicle.findOne({}));
+
+    if (targetVehicle) {
+      const vehicleFilter = {
+        $or: [
+          { vehicleId: targetVehicle._id.toString() },
+          { vehiclePlate: targetVehicle.plate }
+        ]
+      };
+      const latestClosedRide = await Ride.findOne({
+        status: 'closed',
+        ...vehicleFilter
+      }).sort({ date: -1, createdAt: -1 });
+
+      const latestKm = latestClosedRide ? (latestClosedRide.kmEnd || latestClosedRide.kmStart || 0) : 0;
+      targetVehicle.currentKm = latestKm;
+      targetVehicle.lastUpdated = new Date();
+      await targetVehicle.save();
+    }
 
     return NextResponse.json({ success: true, data: {} });
   } catch (error: any) {

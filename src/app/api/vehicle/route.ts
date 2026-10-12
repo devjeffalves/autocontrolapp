@@ -21,7 +21,7 @@ export async function GET() {
       activeVehicle = vehicles[0];
     }
 
-    // Sincronizar KM atual do veículo ativo APENAS com corridas deste veículo específico
+    // Sincronizar KM atual do veículo ativo com a última corrida cronológica deste veículo
     if (activeVehicle) {
       const vehicleFilter = {
         $or: [
@@ -30,24 +30,25 @@ export async function GET() {
         ]
       };
 
-      const maxKmEndRide = await Ride.findOne({
-        kmEnd: { $exists: true, $ne: null },
-        ...vehicleFilter
-      }).sort({ kmEnd: -1 });
+      const latestRide = await Ride.findOne({
+        $and: [
+          {
+            $or: [
+              { kmEnd: { $exists: true, $ne: null } },
+              { kmStart: { $exists: true, $ne: null } }
+            ]
+          },
+          vehicleFilter
+        ]
+      }).sort({ date: -1, createdAt: -1 });
 
-      const maxKmStartRide = await Ride.findOne({
-        kmStart: { $exists: true, $ne: null },
-        ...vehicleFilter
-      }).sort({ kmStart: -1 });
-
-      const maxKmEnd = maxKmEndRide ? (maxKmEndRide.kmEnd || 0) : 0;
-      const maxKmStart = maxKmStartRide ? (maxKmStartRide.kmStart || 0) : 0;
-      const systemMaxKm = Math.max(maxKmEnd, maxKmStart);
-
-      if (systemMaxKm > activeVehicle.currentKm) {
-        activeVehicle.currentKm = systemMaxKm;
-        activeVehicle.lastUpdated = new Date();
-        await activeVehicle.save();
+      if (latestRide) {
+        const latestKm = latestRide.kmEnd || latestRide.kmStart || 0;
+        if (latestKm > 0 && latestKm !== activeVehicle.currentKm) {
+          activeVehicle.currentKm = latestKm;
+          activeVehicle.lastUpdated = new Date();
+          await activeVehicle.save();
+        }
       }
     }
 

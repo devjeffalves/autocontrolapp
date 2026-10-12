@@ -49,12 +49,24 @@ export default function Veiculo() {
       if (vData.vehicles) setVehicles(vData.vehicles);
       
       if (rData.success) {
+        const activeVehId = vData.data?._id ? String(vData.data._id) : '';
+        const activeVehPlate = vData.data?.plate ? String(vData.data.plate).trim().toUpperCase() : '';
+
         const allRides = rData.data;
+        const vehicleRides = allRides.filter((r: any) => {
+          if (!activeVehId && !activeVehPlate) return true;
+          const matchId = activeVehId && r.vehicleId && String(r.vehicleId) === activeVehId;
+          const matchPlate = activeVehPlate && r.vehiclePlate && String(r.vehiclePlate).trim().toUpperCase() === activeVehPlate;
+          return matchId || matchPlate;
+        });
+
+        // Somente usar corridas deste veículo (nunca misturar com corridas de outro veículo)
+        const targetRides = vehicleRides.length > 0 ? vehicleRides : (vData.data ? [] : allRides);
         
         let totalLitres = 0;
         let totalKm = 0;
         
-        const closedRides = allRides.filter((r: any) => r.status === 'closed');
+        const closedRides = targetRides.filter((r: any) => r.status === 'closed');
         closedRides.forEach((r: any) => {
           const rideLitres = r.fuelings?.reduce((acc: number, curr: any) => acc + (curr.litres || 0), 0) || 0;
           totalLitres += rideLitres;
@@ -65,7 +77,7 @@ export default function Veiculo() {
         if (totalLitres > 0) {
           const calculatedAvg = totalKm / totalLitres;
           
-          // Consumo é consistente se estiver em uma faixa física realista (ex: entre 6 e 22 km/L)
+          // Consumo é consistente se estiver em uma faixa física realista (ex: entre 6 e 25 km/L)
           const isAvgInconsistent = calculatedAvg < 6 || calculatedAvg > 25;
           
           setRealAvg(calculatedAvg);
@@ -74,11 +86,11 @@ export default function Veiculo() {
           }
         }
 
-        // Achar o abastecimento mais recente considerando o MAIOR KM (odômetro mais avançado)
+        // Achar o abastecimento mais recente cronologicamente deste veículo
         let lastFueling: { km: number; litres: number; date: Date } | null = null;
         const extractedFuelings: Array<{ km: number; litres: number; date: Date; timestamp: number }> = [];
 
-        for (const ride of allRides) {
+        for (const ride of targetRides) {
           if (ride.fuelings && ride.fuelings.length > 0) {
             for (const f of ride.fuelings) {
               if (f.litres && f.litres > 0) {
@@ -102,19 +114,15 @@ export default function Veiculo() {
         }
 
         if (extractedFuelings.length > 0) {
-          extractedFuelings.sort((a, b) => {
-            if (b.km !== a.km) {
-              return b.km - a.km;
-            }
-            return b.timestamp - a.timestamp;
-          });
+          // Ordenar pelo abastecimento mais recente cronologicamente
+          extractedFuelings.sort((a, b) => b.timestamp - a.timestamp);
           lastFueling = extractedFuelings[0];
         }
 
         if (lastFueling && vData.data) {
           let currentVehicleKm = vData.data.currentKm || 0;
-          if (allRides && allRides.length > 0) {
-            const sortedRides = [...allRides].sort((a, b) => {
+          if (targetRides && targetRides.length > 0) {
+            const sortedRides = [...targetRides].sort((a, b) => {
               const timeA = new Date(a.endTime || a.startTime || a.date).getTime();
               const timeB = new Date(b.endTime || b.startTime || b.date).getTime();
               return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);

@@ -219,7 +219,10 @@ export default function Dashboard() {
     const nextRide = sortedPeriodRides[i + 1];
     const endKm = currRide.kmEnd || currRide.kmStart || 0;
     const nextStartKm = nextRide.kmStart || 0;
-    if (endKm > 0 && nextStartKm > endKm) {
+    const sameVehicle = (!currRide.vehiclePlate && !nextRide.vehiclePlate) ||
+                        (currRide.vehiclePlate === nextRide.vehiclePlate) ||
+                        (currRide.vehicleId && nextRide.vehicleId && currRide.vehicleId === nextRide.vehicleId);
+    if (sameVehicle && endKm > 0 && nextStartKm > endKm && (nextStartKm - endKm) < 3000) {
       unloggedGapsKm += (nextStartKm - endKm);
     }
   }
@@ -251,10 +254,16 @@ export default function Dashboard() {
     return acc + rideLitres;
   }, 0);
 
-  // Média e totais globais (todo o histórico de corridas fechadas)
+  // Média e totais globais (do veículo ativo ou histórico)
   let totalLitresGlobal = 0;
   let totalKmGlobal = 0;
-  closedRides.forEach(r => {
+  const vehicleClosedRides = vehicle ? closedRides.filter(r => 
+    (r.vehicleId && r.vehicleId === vehicle._id) || 
+    (r.vehiclePlate && r.vehiclePlate === vehicle.plate)
+  ) : [];
+  const targetClosedRidesForAvg = vehicleClosedRides.length > 0 ? vehicleClosedRides : closedRides;
+
+  targetClosedRidesForAvg.forEach(r => {
     const rideLitres = r.fuelings?.reduce((fAcc: number, fCurr: any) => fAcc + (fCurr.litres || 0), 0) || 0;
     totalLitresGlobal += rideLitres;
     totalKmGlobal += (r.kmTotal || 0);
@@ -415,7 +424,19 @@ export default function Dashboard() {
   let lastFueling: { km: number; litres: number; date: Date } | null = null;
   const extractedFuelings: Array<{ km: number; litres: number; date: Date; timestamp: number }> = [];
 
-  for (const ride of rides) {
+  const activeVehId = vehicle?._id ? String(vehicle._id) : '';
+  const activeVehPlate = vehicle?.plate ? String(vehicle.plate).trim().toUpperCase() : '';
+
+  const ridesForFueling = rides.filter((r: any) => {
+    if (!activeVehId && !activeVehPlate) return true;
+    const matchId = activeVehId && r.vehicleId && String(r.vehicleId) === activeVehId;
+    const matchPlate = activeVehPlate && r.vehiclePlate && String(r.vehiclePlate).trim().toUpperCase() === activeVehPlate;
+    return matchId || matchPlate;
+  });
+
+  const targetRidesForFueling = ridesForFueling.length > 0 ? ridesForFueling : (vehicle ? [] : rides);
+
+  for (const ride of targetRidesForFueling) {
     if (ride.fuelings && ride.fuelings.length > 0) {
       for (const f of ride.fuelings) {
         if (f.litres && f.litres > 0) {
@@ -439,23 +460,17 @@ export default function Dashboard() {
   }
 
   if (extractedFuelings.length > 0) {
-    // Ordena primariamente pelo MAIOR KM registrado no abastecimento (mais recente no odômetro)
-    // Se os KMs forem iguais, ordena por data mais recente
-    extractedFuelings.sort((a, b) => {
-      if (b.km !== a.km) {
-        return b.km - a.km;
-      }
-      return b.timestamp - a.timestamp;
-    });
+    // Ordena pelo abastecimento mais recente cronologicamente deste veículo
+    extractedFuelings.sort((a, b) => b.timestamp - a.timestamp);
     lastFueling = extractedFuelings[0];
   }
 
   let projection: { nextFuelingKm: number; kmRemaining: number; status: 'ok' | 'warning' | 'urgent' } | null = null;
   if (lastFueling && vehicle) {
-    // Resolve o KM atual do veículo considerando o turno mais recente para evitar discrepâncias do banco
+    // Resolve o KM atual do veículo considerando o turno mais recente deste veículo
     let currentVehicleKm = vehicle.currentKm || 0;
-    if (rides && rides.length > 0) {
-      const sortedRides = [...rides].sort((a, b) => {
+    if (targetRidesForFueling && targetRidesForFueling.length > 0) {
+      const sortedRides = [...targetRidesForFueling].sort((a, b) => {
         const timeA = new Date(a.endTime || a.startTime || a.date).getTime();
         const timeB = new Date(b.endTime || b.startTime || b.date).getTime();
         return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
