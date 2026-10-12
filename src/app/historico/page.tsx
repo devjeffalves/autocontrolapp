@@ -980,175 +980,193 @@ export default function Historico() {
       {/* Modal de Edição */}
       <AnimatePresence>
         {editingItem && (
-          <div className="modal-overlay">
+          <div className="modal-overlay" onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingItem(null);
+          }}>
             <motion.div 
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
               className="modal-content card"
             >
-              <div className="modal-header">
-                <h3 className="modal-title">Editar Registro</h3>
-                <button className="close-btn" onClick={() => setEditingItem(null)}>
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <form onSubmit={handleUpdate} className="edit-form">
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label>Ganhos (R$)</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      value={editingItem.earnings} 
-                      onChange={e => setEditingItem({...editingItem, earnings: parseFloat(e.target.value)})}
-                      required
-                    />
+              <form onSubmit={handleUpdate} className="modal-form">
+                <div className="modal-header">
+                  <div className="modal-header-info">
+                    <h3 className="modal-title">Editar Turno</h3>
+                    <span className="modal-subtitle">
+                      {editingItem.date ? new Date(editingItem.date).toLocaleDateString('pt-BR') : 'Ajuste de registro'}
+                    </span>
                   </div>
-                  <div className="form-group">
-                    <label>Corridas</label>
-                    <input 
-                      type="number" 
-                      value={editingItem.rides} 
-                      onChange={e => setEditingItem({...editingItem, rides: parseInt(e.target.value)})}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>KM Inicial</label>
-                    <input 
-                      type="number" 
-                      value={editingItem.kmStart} 
-                      onChange={e => setEditingItem({...editingItem, kmStart: parseInt(e.target.value)})}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>KM Final</label>
-                    <input 
-                      type="number" 
-                      value={editingItem.kmEnd || ''} 
-                      onChange={e => setEditingItem({...editingItem, kmEnd: parseInt(e.target.value)})}
-                      required
-                    />
-                  </div>
-                  <div className="form-group full-mobile">
-                    <label>Início do Turno</label>
-                    <input 
-                      type="datetime-local" 
-                      value={dateToLocalInputValue(editingItem.startTime)} 
-                      onChange={e => setEditingItem({...editingItem, startTime: e.target.value})}
-                    />
-                  </div>
-                  <div className="form-group full-mobile">
-                    <label>Fim do Turno</label>
-                    <input 
-                      type="datetime-local" 
-                      value={dateToLocalInputValue(editingItem.endTime)} 
-                      onChange={e => setEditingItem({...editingItem, endTime: e.target.value})}
-                    />
-                  </div>
-                  <div className="form-group full">
-                    <label>Tipo / Plataforma</label>
-                    <select 
-                      value={editingItem.platform} 
-                      onChange={e => setEditingItem({...editingItem, platform: e.target.value})}
-                    >
-                      <option value="Aplicativos">Aplicativos</option>
-                      <option value="Passeio">Passeio</option>
-                    </select>
-                  </div>
+                  <button type="button" className="close-btn" onClick={() => setEditingItem(null)} aria-label="Fechar">
+                    <X size={20} />
+                  </button>
                 </div>
-
-                {/* Seção de Abastecimentos no Modal */}
-                <div className="modal-fuelings-section">
-                  <h4 className="fuelings-title">Abastecimentos do Turno</h4>
-                  
-                  <div className="modal-fuelings-list">
-                    {!editingItem.fuelings || editingItem.fuelings.length === 0 ? (
-                      <p className="no-fuelings">Nenhum abastecimento associado.</p>
-                    ) : (
-                      editingItem.fuelings.map((f: any, fIdx: number) => (
-                        <div key={fIdx} className="modal-fueling-item">
-                          <span>R$ {f.cost.toFixed(2)} • {f.litres}L {f.km ? `• ${f.km} KM` : ''}</span>
-                          <button 
-                            type="button" 
-                            className="remove-fueling-btn"
-                            onClick={() => {
-                              const updatedFuelings = [...editingItem.fuelings];
-                              updatedFuelings.splice(fIdx, 1);
-                              setEditingItem({ ...editingItem, fuelings: updatedFuelings });
-                            }}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      ))
-                    )}
+                
+                <div className="modal-body-scroll">
+                  <div className="form-grid">
+                    <div className="form-group col-half">
+                      <label>Ganhos (R$)</label>
+                      <input 
+                        type="number" 
+                        step="0.01" 
+                        value={editingItem.earnings} 
+                        onChange={e => setEditingItem({...editingItem, earnings: parseFloat(e.target.value) || 0})}
+                        required
+                      />
+                    </div>
+                    <div className="form-group col-half">
+                      <label>Corridas</label>
+                      <input 
+                        type="number" 
+                        value={editingItem.rides} 
+                        onChange={e => setEditingItem({...editingItem, rides: parseInt(e.target.value) || 0})}
+                        required
+                      />
+                    </div>
+                    <div className="form-group col-half">
+                      <label>KM Inicial</label>
+                      <input 
+                        type="number" 
+                        value={editingItem.kmStart} 
+                        onChange={e => setEditingItem({...editingItem, kmStart: parseInt(e.target.value) || 0})}
+                        required
+                      />
+                    </div>
+                    <div className="form-group col-half">
+                      <label>KM Final</label>
+                      <input 
+                        type="number" 
+                        value={editingItem.kmEnd ?? ''} 
+                        onChange={e => setEditingItem({...editingItem, kmEnd: parseInt(e.target.value) || 0})}
+                        required
+                      />
+                    </div>
+                    <div className="form-group col-full">
+                      <label>Início do Turno</label>
+                      <input 
+                        type="datetime-local" 
+                        value={dateToLocalInputValue(editingItem.startTime)} 
+                        onChange={e => setEditingItem({...editingItem, startTime: e.target.value})}
+                      />
+                    </div>
+                    <div className="form-group col-full">
+                      <label>Fim do Turno</label>
+                      <input 
+                        type="datetime-local" 
+                        value={dateToLocalInputValue(editingItem.endTime)} 
+                        onChange={e => setEditingItem({...editingItem, endTime: e.target.value})}
+                      />
+                    </div>
+                    <div className="form-group col-full">
+                      <label>Tipo / Plataforma</label>
+                      <select 
+                        value={editingItem.platform} 
+                        onChange={e => setEditingItem({...editingItem, platform: e.target.value})}
+                      >
+                        <option value="Aplicativos">Aplicativos</option>
+                        <option value="Passeio">Passeio</option>
+                      </select>
+                    </div>
                   </div>
 
-                  <div className="add-fueling-quick">
-                    <h5>Adicionar Abastecimento</h5>
-                    <div className="quick-inputs">
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="R$ 0,00"
-                        id="quick-cost"
-                      />
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0.00 L"
-                        id="quick-litres"
-                      />
-                      <input 
-                        type="number" 
-                        placeholder="KM no posto"
-                        id="quick-km"
-                      />
-                      <button 
-                        type="button" 
-                        onClick={() => {
-                          const costEl = document.getElementById('quick-cost') as HTMLInputElement;
-                          const litresEl = document.getElementById('quick-litres') as HTMLInputElement;
-                          const kmEl = document.getElementById('quick-km') as HTMLInputElement;
-                          
-                          if (costEl && litresEl) {
-                            const cost = parseFloat(costEl.value);
-                            const litres = parseFloat(litresEl.value);
-                            const km = kmEl.value ? parseInt(kmEl.value) : (editingItem.kmEnd || editingItem.kmStart);
+                  {/* Seção de Abastecimentos no Modal */}
+                  <div className="modal-fuelings-section">
+                    <h4 className="fuelings-title">Abastecimentos do Turno</h4>
+                    
+                    <div className="modal-fuelings-list">
+                      {!editingItem.fuelings || editingItem.fuelings.length === 0 ? (
+                        <p className="no-fuelings">Nenhum abastecimento associado a este turno.</p>
+                      ) : (
+                        editingItem.fuelings.map((f: any, fIdx: number) => (
+                          <div key={fIdx} className="modal-fueling-item">
+                            <span>R$ {f.cost.toFixed(2)} • {f.litres}L {f.km ? `• ${f.km} KM` : ''}</span>
+                            <button 
+                              type="button" 
+                              className="remove-fueling-btn"
+                              title="Remover abastecimento"
+                              onClick={() => {
+                                const updatedFuelings = [...editingItem.fuelings];
+                                updatedFuelings.splice(fIdx, 1);
+                                setEditingItem({ ...editingItem, fuelings: updatedFuelings });
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="add-fueling-quick">
+                      <h5>Adicionar Abastecimento</h5>
+                      <div className="quick-inputs">
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="R$ 0,00"
+                          id="quick-cost"
+                        />
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          placeholder="Litros"
+                          id="quick-litres"
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="KM Posto"
+                          id="quick-km"
+                        />
+                        <button 
+                          type="button" 
+                          className="quick-add-btn"
+                          title="Adicionar abastecimento"
+                          onClick={() => {
+                            const costEl = document.getElementById('quick-cost') as HTMLInputElement;
+                            const litresEl = document.getElementById('quick-litres') as HTMLInputElement;
+                            const kmEl = document.getElementById('quick-km') as HTMLInputElement;
                             
-                            if (cost > 0 && litres > 0) {
-                              const newF = {
-                                cost,
-                                litres,
-                                km,
-                                date: new Date()
-                              };
-                              const updatedFuelings = [...(editingItem.fuelings || []), newF];
-                              setEditingItem({ ...editingItem, fuelings: updatedFuelings });
+                            if (costEl && litresEl) {
+                              const cost = parseFloat(costEl.value);
+                              const litres = parseFloat(litresEl.value);
+                              const km = kmEl.value ? parseInt(kmEl.value) : (editingItem.kmEnd || editingItem.kmStart);
                               
-                              costEl.value = '';
-                              litresEl.value = '';
-                              kmEl.value = '';
-                            } else {
-                              alert('Preencha Valor e Litros.');
+                              if (cost > 0 && litres > 0) {
+                                const newF = {
+                                  cost,
+                                  litres,
+                                  km,
+                                  date: new Date()
+                                };
+                                const updatedFuelings = [...(editingItem.fuelings || []), newF];
+                                setEditingItem({ ...editingItem, fuelings: updatedFuelings });
+                                
+                                costEl.value = '';
+                                litresEl.value = '';
+                                kmEl.value = '';
+                              } else {
+                                alert('Preencha Valor e Litros.');
+                              }
                             }
-                          }
-                        }}
-                      >
-                        +
-                      </button>
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <button type="submit" className="save-btn" style={{ marginTop: '10px' }}>
-                  <Save size={18} />
-                  Salvar Alterações
-                </button>
+                <div className="modal-footer">
+                  <button type="button" className="cancel-modal-btn" onClick={() => setEditingItem(null)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="save-btn">
+                    <Save size={16} />
+                    Salvar Alterações
+                  </button>
+                </div>
               </form>
             </motion.div>
           </div>
@@ -1708,33 +1726,42 @@ export default function Historico() {
           color: var(--text-muted);
         }
 
-        /* Modal Styles */
+        /* Modal Styles Atualizado e Responsivo */
         .modal-overlay {
           position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(4px);
+          inset: 0;
+          background: rgba(15, 23, 42, 0.65);
+          backdrop-filter: blur(6px);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 2000;
-          padding: 12px;
+          padding: 16px;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         .modal-content {
           width: 100%;
-          max-width: 450px;
-          padding: 20px;
-          background: white;
-          border-radius: 16px;
-          margin: auto;
-          max-height: 85dvh;
+          max-width: 460px;
+          background: #ffffff;
+          border-radius: 20px;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+          overflow: hidden;
+          box-sizing: border-box;
+          max-height: min(88dvh, 720px);
+          max-height: min(88vh, 720px);
           display: flex;
           flex-direction: column;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+          margin: auto;
+        }
+
+        .modal-form {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          max-height: min(88dvh, 720px);
+          max-height: min(88vh, 720px);
           overflow: hidden;
         }
 
@@ -1742,30 +1769,67 @@ export default function Historico() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 14px;
+          padding: 16px 20px;
+          border-bottom: 1px solid #f1f5f9;
+          background: #ffffff;
           flex-shrink: 0;
+        }
+
+        .modal-header-info {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
         }
 
         .modal-title {
           font-size: 1.125rem;
-          font-weight: 700;
+          font-weight: 800;
+          color: #0f172a;
+          margin: 0;
+          line-height: 1.2;
+        }
+
+        .modal-subtitle {
+          font-size: 0.75rem;
+          color: #64748b;
+          font-weight: 500;
         }
 
         .close-btn {
-          background: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          background: #f1f5f9;
           border: none;
-          color: var(--text-muted);
+          color: #64748b;
           cursor: pointer;
-          padding: 4px;
+          transition: all 0.15s;
         }
 
-        .edit-form {
+        .close-btn:hover {
+          background: #e2e8f0;
+          color: #0f172a;
+        }
+
+        .modal-body-scroll {
+          padding: 16px 20px;
+          overflow-y: auto;
+          flex: 1;
           display: flex;
           flex-direction: column;
-          gap: 14px;
-          overflow-y: auto;
-          padding-right: 4px;
-          flex: 1;
+          gap: 16px;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .modal-body-scroll::-webkit-scrollbar {
+          width: 5px;
+        }
+        .modal-body-scroll::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 4px;
         }
 
         .form-grid {
@@ -1777,56 +1841,50 @@ export default function Historico() {
         .form-group {
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 5px;
         }
 
-        .form-group.full {
+        .form-group.col-half {
+          grid-column: span 1;
+        }
+
+        .form-group.col-full {
           grid-column: span 2;
         }
 
         .form-group label {
           font-size: 0.75rem;
           font-weight: 700;
-          color: var(--text-muted);
+          color: #475569;
+          text-transform: uppercase;
+          letter-spacing: 0.025em;
         }
 
         .form-group input, .form-group select {
-          padding: 9px 12px;
-          border-radius: 8px;
-          border: 1px solid var(--glass-border);
-          background: #f8fafc;
-          font-size: 0.875rem;
-          font-weight: 600;
-          min-width: 0;
-          max-width: 100%;
-          box-sizing: border-box;
-        }
-
-        .save-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding: 12px;
-          background: var(--primary);
-          color: white;
-          border: none;
+          padding: 10px 12px;
           border-radius: 10px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.2s;
-          flex-shrink: 0;
+          border: 1px solid #cbd5e1;
+          background: #f8fafc;
+          font-size: 0.925rem;
+          font-weight: 600;
+          color: #0f172a;
+          box-sizing: border-box;
+          width: 100%;
+          transition: border-color 0.15s, box-shadow 0.15s;
         }
 
-        .save-btn:hover {
-          filter: brightness(1.1);
-          transform: translateY(-1px);
+        .form-group input:focus, .form-group select:focus {
+          outline: none;
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+          background: #ffffff;
         }
 
         .modal-fuelings-section {
-          border-top: 1px solid var(--glass-border);
-          padding-top: 12px;
-          margin-top: 4px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          padding: 12px;
           display: flex;
           flex-direction: column;
           gap: 10px;
@@ -1834,91 +1892,141 @@ export default function Historico() {
 
         .fuelings-title {
           font-size: 0.75rem;
-          font-weight: 700;
-          color: var(--text-muted);
+          font-weight: 800;
+          color: #334155;
           text-transform: uppercase;
+          margin: 0;
         }
 
         .modal-fuelings-list {
           display: flex;
           flex-direction: column;
           gap: 6px;
-          max-height: 100px;
+          max-height: 90px;
           overflow-y: auto;
-        }
-
-        .no-fuelings {
-          font-size: 0.75rem;
-          color: var(--text-muted);
-          font-style: italic;
         }
 
         .modal-fueling-item {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: #f8fafc;
-          padding: 6px 10px;
-          border-radius: 6px;
+          background: #ffffff;
+          padding: 7px 10px;
+          border-radius: 8px;
           font-size: 0.75rem;
           font-weight: 600;
-          border: 1px solid #f1f5f9;
+          color: #1e293b;
+          border: 1px solid #e2e8f0;
         }
 
         .remove-fueling-btn {
-          background: none;
+          background: #fee2e2;
           border: none;
-          color: #ef4444;
-          cursor: pointer;
+          color: #dc2626;
+          border-radius: 6px;
+          width: 22px;
+          height: 22px;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 2px;
+          cursor: pointer;
         }
 
         .add-fueling-quick {
           display: flex;
           flex-direction: column;
           gap: 8px;
-          background: #f8fafc;
-          padding: 10px;
-          border-radius: 8px;
-          border: 1px dashed var(--glass-border);
         }
 
         .add-fueling-quick h5 {
-          font-size: 0.725rem;
+          font-size: 0.7rem;
           font-weight: 700;
-          color: var(--text-muted);
+          color: #64748b;
+          margin: 0;
+          text-transform: uppercase;
         }
 
         .quick-inputs {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr auto;
+          grid-template-columns: 1fr 1fr 1fr 34px;
           gap: 6px;
           align-items: center;
         }
 
         .quick-inputs input {
-          padding: 6px 8px !important;
-          font-size: 0.75rem !important;
+          padding: 7px 8px !important;
+          font-size: 0.8rem !important;
           font-weight: 600;
-          border-radius: 6px !important;
+          border-radius: 8px !important;
+          border: 1px solid #cbd5e1;
+          background: #ffffff;
+          box-sizing: border-box;
+          width: 100%;
         }
 
-        .quick-inputs button {
+        .quick-add-btn {
           background: var(--primary);
           color: white;
           border: none;
-          width: 28px;
-          height: 28px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-weight: 700;
-          font-size: 1rem;
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
           display: flex;
           align-items: center;
           justify-content: center;
+          font-weight: 800;
+          font-size: 1.1rem;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+
+        .modal-footer {
+          padding: 12px 20px;
+          background: #ffffff;
+          border-top: 1px solid #f1f5f9;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-shrink: 0;
+        }
+
+        .cancel-modal-btn {
+          padding: 10px 16px;
+          background: #f1f5f9;
+          color: #475569;
+          border: none;
+          border-radius: 10px;
+          font-weight: 700;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+
+        .cancel-modal-btn:hover {
+          background: #e2e8f0;
+          color: #0f172a;
+        }
+
+        .save-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 10px 18px;
+          background: var(--primary);
+          color: white;
+          border: none;
+          border-radius: 10px;
+          font-weight: 700;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .save-btn:hover {
+          filter: brightness(1.1);
+          transform: translateY(-1px);
         }
 
         @media (max-width: 480px) {
@@ -1931,56 +2039,65 @@ export default function Historico() {
           .filter-row {
             flex-direction: column;
           }
-          .form-grid {
-            grid-template-columns: 1fr !important;
-            gap: 10px;
-            width: 100%;
-          }
-          .form-group.full, .form-group.full-mobile {
-            grid-column: span 1 !important;
-          }
           .modal-overlay {
             padding: 8px;
-            overflow-x: hidden;
-            align-items: center;
-            justify-content: center;
           }
           .modal-content {
-            padding: 14px 12px;
-            max-width: calc(100vw - 16px);
-            width: calc(100vw - 16px);
-            max-height: calc(100dvh - 16px);
-            border-radius: 14px;
-            overflow-x: hidden;
-            box-sizing: border-box;
+            max-height: calc(92dvh - 16px);
+            max-height: calc(92vh - 16px);
+            border-radius: 16px;
           }
-          .edit-form {
-            overflow-x: hidden;
-            width: 100%;
-            gap: 10px;
+          .modal-form {
+            max-height: calc(92dvh - 16px);
+            max-height: calc(92vh - 16px);
+          }
+          .modal-header {
+            padding: 12px 14px;
+          }
+          .modal-body-scroll {
+            padding: 12px 14px;
+            gap: 12px;
+          }
+          .modal-footer {
+            padding: 10px 14px;
+          }
+          .form-grid {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px;
+          }
+          .form-group.col-half {
+            grid-column: span 1 !important;
+          }
+          .form-group.col-full {
+            grid-column: span 2 !important;
+          }
+          .form-group label {
+            font-size: 0.7rem;
           }
           .form-group input, .form-group select {
-            font-size: 1rem !important;
-            padding: 10px 12px;
-            width: 100%;
-            box-sizing: border-box;
+            padding: 8px 10px;
+            font-size: 0.875rem !important;
+            border-radius: 8px;
           }
           .quick-inputs {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            width: 100%;
+            grid-template-columns: 1fr 1fr 1fr 32px !important;
+            display: grid !important;
+            flex-direction: unset !important;
+            gap: 4px !important;
           }
           .quick-inputs input {
+            padding: 6px 6px !important;
+            font-size: 0.75rem !important;
             width: 100% !important;
-            box-sizing: border-box;
+          }
+          .quick-add-btn {
+            width: 32px !important;
+            height: 32px !important;
             font-size: 1rem !important;
           }
-          .quick-inputs button {
-            width: 100% !important;
-            height: 38px;
-            font-size: 1rem;
-            font-weight: 700;
+          .save-btn, .cancel-modal-btn {
+            padding: 10px 14px;
+            font-size: 0.825rem;
           }
         }
 
